@@ -84,9 +84,7 @@ class ImmersionService:
 
     def give_writing_feedback(self, payload: WritingFeedbackRequest) -> WritingFeedback:
         sentences = [
-            item.strip()
-            for item in re.split(r"(?<=[.!?])\s+", payload.draft)
-            if item.strip()
+            item.strip() for item in re.split(r"(?<=[.!?])\s+", payload.draft) if item.strip()
         ]
         corrected = " ".join(sentence[:1].upper() + sentence[1:] for sentence in sentences)
         suggestions = ["先用一句话回答题目，再补充一个具体例子。"]

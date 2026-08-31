@@ -11,6 +11,11 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:3000"
     owner_bootstrap_token: str = "local-development-only"
     media_import_allowed_hosts: str = "youtube.com,youtu.be,vimeo.com"
+    database_url: str = "postgresql+asyncpg://varbaia:change-me@localhost:5432/varbaia"
+    redis_url: str = "redis://localhost:6379/0"
+    jwt_secret: str = "local-development-only-change-before-deploy"
+    access_token_minutes: int = 15
+    allow_registration: bool = False
 
     @property
     def allowed_origins(self) -> list[str]:

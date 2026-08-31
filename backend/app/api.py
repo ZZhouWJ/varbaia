@@ -30,9 +30,7 @@ def health(settings: Settings = Depends(get_settings)) -> dict[str, str]:
     return {"status": "ok", "service": settings.app_name, "environment": settings.app_env}
 
 
-@router.post(
-    "/immersion/imports", response_model=ImportJob, status_code=202, tags=["immersion"]
-)
+@router.post("/immersion/imports", response_model=ImportJob, status_code=202, tags=["immersion"])
 def create_import(
     payload: VideoImportRequest, service: ImmersionService = Depends(get_service)
 ) -> ImportJob:
@@ -40,16 +38,12 @@ def create_import(
 
 
 @router.get("/immersion/imports/{job_id}", response_model=ImportJob, tags=["immersion"])
-def get_import(
-    job_id: UUID, service: ImmersionService = Depends(get_service)
-) -> ImportJob:
+def get_import(job_id: UUID, service: ImmersionService = Depends(get_service)) -> ImportJob:
     return service.get_job(job_id)
 
 
 @router.post("/immersion/imports/{job_id}/advance", response_model=ImportJob, tags=["immersion"])
-def advance_import(
-    job_id: UUID, service: ImmersionService = Depends(get_service)
-) -> ImportJob:
+def advance_import(job_id: UUID, service: ImmersionService = Depends(get_service)) -> ImportJob:
     return service.advance_import(job_id)
 
 
@@ -63,6 +57,7 @@ async def import_events(
             yield f"event: progress\\ndata: {job.model_dump_json()}\\n\\n"
             if job.progress == 100:
                 break
+
     return StreamingResponse(stream(), media_type="text/event-stream")
 
 
