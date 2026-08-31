@@ -1,6 +1,7 @@
 from datetime import UTC, datetime, timedelta
+from time import monotonic
 
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import select
@@ -19,6 +20,16 @@ from app.models import RefreshSession, User
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 bearer = HTTPBearer(auto_error=False)
+login_attempts: dict[str, list[float]] = {}
+
+
+def enforce_login_rate_limit(key: str) -> None:
+    now = monotonic()
+    attempts = [at for at in login_attempts.get(key, []) if now - at < 60]
+    if len(attempts) >= 8:
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="请稍后再试")
+    attempts.append(now)
+    login_attempts[key] = attempts
 
 
 class LoginRequest(BaseModel):
@@ -71,10 +82,14 @@ async def issue_session(
 @router.post("/login", response_model=TokenResponse)
 async def login(
     payload: LoginRequest,
+    request: Request,
     response: Response,
     session: AsyncSession = Depends(get_session),
     settings: Settings = Depends(get_settings),
 ) -> TokenResponse:
+    enforce_login_rate_limit(
+        f"{request.client.host if request.client else 'unknown'}:{payload.email}"
+    )
     user = await session.scalar(select(User).where(User.email == payload.email.lower()))
     try:
         valid = user is not None and password_hasher.verify(user.password_hash, payload.password)
