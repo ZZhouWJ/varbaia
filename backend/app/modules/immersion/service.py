@@ -1,3 +1,4 @@
+import ipaddress
 import re
 from collections import defaultdict
 from urllib.parse import urlparse
@@ -28,6 +29,15 @@ class ImmersionService:
 
     def create_import(self, payload: VideoImportRequest) -> ImportJob:
         hostname = (urlparse(str(payload.source_url)).hostname or "").lower()
+        try:
+            address = ipaddress.ip_address(hostname)
+            if address.is_private or address.is_loopback or address.is_link_local:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                    detail="禁止访问内部网络地址",
+                )
+        except ValueError:
+            pass
         is_allowed = any(
             hostname == host or hostname.endswith(f".{host}")
             for host in self.settings.allowed_media_hosts
