@@ -5,7 +5,9 @@ from app.core.config import get_settings
 from app.models import Base
 
 config = context.config
-config.set_main_option("sqlalchemy.url", get_settings().database_url.replace("+asyncpg", ""))
+config.set_main_option(
+    "sqlalchemy.url", get_settings().database_url.replace("+asyncpg", "+psycopg")
+)
 target_metadata = Base.metadata
 
 
