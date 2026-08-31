@@ -1,0 +1,125 @@
+"use client";
+
+import {
+  BookOpen,
+  Check,
+  ChevronRight,
+  Compass,
+  Flame,
+  Headphones,
+  Library,
+  Menu,
+  Mic2,
+  Moon,
+  Play,
+  Plus,
+  Send,
+  Sparkles,
+  Sun,
+  UserRound,
+  Volume2,
+  X,
+} from "lucide-react";
+import { FormEvent, useEffect, useState } from "react";
+
+type Section = "今日" | "沉浸" | "复习" | "词库" | "我";
+
+const navigation: { label: Section; icon: typeof Compass }[] = [
+  { label: "今日", icon: Compass },
+  { label: "沉浸", icon: Play },
+  { label: "复习", icon: BookOpen },
+  { label: "词库", icon: Library },
+  { label: "我", icon: UserRound },
+];
+
+const practiceSteps = ["精听", "听写", "跟读", "角色扮演"];
+
+export default function Home() {
+  const [active, setActive] = useState<Section>("今日");
+  const [dark, setDark] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [toast, setToast] = useState("");
+  const [dictation, setDictation] = useState("");
+  const [checked, setChecked] = useState(false);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = dark ? "dark" : "light";
+  }, [dark]);
+
+  function notify(message: string) {
+    setToast(message);
+    window.setTimeout(() => setToast(""), 3200);
+  }
+
+  function submitImport(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setDialogOpen(false);
+    notify("视频已加入处理队列，完成后会出现在沉浸学习中。");
+  }
+
+  return (
+    <main className="app-shell">
+      <aside className={`sidebar ${menuOpen ? "sidebar--open" : ""}`} aria-label="主导航">
+        <div className="brand"><Sparkles aria-hidden /> <span>Verbaia</span></div>
+        <p className="brand-note">你的英语沉浸空间</p>
+        <nav>
+          {navigation.map(({ label, icon: Icon }) => (
+            <button className={`nav-item ${active === label ? "is-active" : ""}`} key={label} onClick={() => { setActive(label); setMenuOpen(false); }}>
+              <Icon aria-hidden size={20} /><span>{label}</span>
+            </button>
+          ))}
+        </nav>
+        <div className="sidebar-footer">
+          <button className="theme-toggle" onClick={() => setDark((value) => !value)} aria-label="切换明暗主题">
+            {dark ? <Sun size={18} /> : <Moon size={18} />} {dark ? "浅色" : "深色"}
+          </button>
+          <div className="identity"><span>WZ</span><div><strong>Wenjie</strong><small>个人学习空间</small></div></div>
+        </div>
+      </aside>
+
+      {menuOpen && <button className="scrim" aria-label="关闭导航" onClick={() => setMenuOpen(false)} />}
+
+      <section className="content">
+        <header className="topbar">
+          <button className="icon-button mobile-menu" aria-label="打开导航" onClick={() => setMenuOpen(true)}><Menu /></button>
+          <div><p className="eyebrow">MONDAY · 31 AUG</p><h1>{active === "今日" ? "今天，学一点真英语。" : active}</h1></div>
+          <button className="primary-button top-action" onClick={() => setDialogOpen(true)}><Plus size={18} /> 导入视频</button>
+        </header>
+
+        <section className="overview-grid" aria-label="今日学习概览">
+          <article className="hero-card">
+            <div className="hero-copy"><p className="eyebrow">TODAY&apos;S FOCUS</p><h2>从一段真实对话，开始你的沉浸练习。</h2><p>完成 18 分钟精听、听写与跟读，建立可复用的表达。</p><button className="primary-button" onClick={() => setActive("沉浸")}>继续学习 <ChevronRight size={18} /></button></div>
+            <div className="hero-orbit" aria-hidden><span>18</span><small>分钟</small></div>
+          </article>
+          <article className="streak-card"><Flame aria-hidden /><p>连续学习</p><strong>12 <small>天</small></strong><div className="week" aria-label="本周学习记录">{[1, 1, 1, 1, 1, 0, 0].map((done, index) => <span className={done ? "done" : ""} key={index} />)}</div></article>
+        </section>
+
+        <section className="section-heading"><div><p className="eyebrow">IMMERSION PATH</p><h2>正在进行</h2></div><button className="text-button" onClick={() => setActive("沉浸")}>查看全部 <ChevronRight size={16} /></button></section>
+        <article className="lesson-card">
+          <div className="video-cover"><span className="cover-label">BBC LEARNING</span><button className="play-button" aria-label="播放本课" onClick={() => notify("已从 06:42 继续播放。")}><Play fill="currentColor" /></button><span className="duration">12:48</span></div>
+          <div className="lesson-detail"><div className="lesson-meta"><span className="tag">B1 · en-GB</span><span>上次学习于今天 09:18</span></div><h3>How cities can become more liveable</h3><p>从城市生活议题中练习观点表达与自然连读。</p><div className="progress-line"><span style={{ width: "62%" }} /></div><div className="lesson-bottom"><strong>已完成 62%</strong><button className="outline-button" onClick={() => setActive("沉浸")}>继续 <ChevronRight size={16} /></button></div></div>
+        </article>
+
+        <section className="section-heading practice-heading"><div><p className="eyebrow">ONE SENTENCE AT A TIME</p><h2>今日微练习</h2></div><span className="subtle-count">4 个步骤</span></section>
+        <section className="practice-grid">
+          {practiceSteps.map((step, index) => {
+            const icons = [Headphones, Volume2, Mic2, Send];
+            const Icon = icons[index];
+            return <button className="practice-card" key={step} onClick={() => notify(`${step}练习已准备好。`)}><span className="practice-index">0{index + 1}</span><Icon aria-hidden /><strong>{step}</strong><small>{["听懂语块", "补全句子", "模仿节奏", "开口回应"][index]}</small></button>;
+          })}
+        </section>
+
+        <section className="review-panel" aria-labelledby="dictation-title">
+          <div><p className="eyebrow">QUICK CHECK</p><h2 id="dictation-title">听写一句</h2><p className="quote">“The best way to learn is to stay curious.”</p><button className="sound-button" onClick={() => notify("正在播放示范音频。")}><Volume2 size={17} /> 播放 0:06</button></div>
+          <form onSubmit={(event) => { event.preventDefault(); setChecked(true); }}><label htmlFor="dictation">听到什么？</label><div className="input-row"><input id="dictation" value={dictation} onChange={(event) => { setDictation(event.target.value); setChecked(false); }} placeholder="输入你听到的英文…" /><button className="primary-button" type="submit">检查</button></div>{checked && <p className="feedback"><Check size={16} /> 很接近！注意 <em>stay curious</em> 的连读。</p>}</form>
+        </section>
+      </section>
+
+      <nav className="bottom-nav" aria-label="移动端主导航">{navigation.map(({ label, icon: Icon }) => <button key={label} className={active === label ? "is-active" : ""} onClick={() => setActive(label)}><Icon size={20} /><span>{label}</span></button>)}</nav>
+
+      {dialogOpen && <div className="modal-layer" role="dialog" aria-modal="true" aria-labelledby="import-title"><button className="scrim" aria-label="关闭导入窗口" onClick={() => setDialogOpen(false)} /><form className="import-modal" onSubmit={submitImport}><div className="modal-heading"><div><p className="eyebrow">NEW IMMERSION</p><h2 id="import-title">导入一段英语视频</h2></div><button type="button" className="icon-button" aria-label="关闭" onClick={() => setDialogOpen(false)}><X /></button></div><label htmlFor="video-url">HTTPS 视频链接</label><input id="video-url" type="url" required placeholder="https://www.youtube.com/watch?..." /><p className="form-note">当前仅接收已授权的平台链接；导入后会异步生成英语片段与练习。</p><div className="modal-actions"><button type="button" className="text-button" onClick={() => setDialogOpen(false)}>取消</button><button className="primary-button" type="submit">加入队列 <ChevronRight size={17} /></button></div></form></div>}
+      {toast && <div className="toast" role="status"><Check size={18} /> {toast}</div>}
+    </main>
+  );
+}
