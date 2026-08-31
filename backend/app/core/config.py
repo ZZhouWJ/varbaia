@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379/0"
     jwt_secret: str = "local-development-only-change-before-deploy"
     access_token_minutes: int = 15
+    refresh_token_days: int = 14
     allow_registration: bool = False
 
     @property

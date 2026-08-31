@@ -25,6 +25,19 @@ def upgrade() -> None:
     )
     op.create_index("ix_users_email", "users", ["email"], unique=True)
     op.create_table(
+        "refresh_sessions",
+        sa.Column("id", sa.Uuid(), primary_key=True),
+        sa.Column("owner_user_id", sa.Uuid(), sa.ForeignKey("users.id"), nullable=False),
+        sa.Column("token_hash", sa.String(128), nullable=False),
+        sa.Column("expires_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("revoked_at", sa.DateTime(timezone=True)),
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+    )
+    op.create_index("ix_refresh_sessions_owner_user_id", "refresh_sessions", ["owner_user_id"])
+    op.create_index(
+        "ix_refresh_sessions_token_hash", "refresh_sessions", ["token_hash"], unique=True
+    )
+    op.create_table(
         "import_jobs",
         sa.Column("id", sa.Uuid(), primary_key=True),
         sa.Column("owner_user_id", sa.Uuid(), sa.ForeignKey("users.id"), nullable=False),
@@ -56,4 +69,5 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.drop_table("job_events")
     op.drop_table("import_jobs")
+    op.drop_table("refresh_sessions")
     op.drop_table("users")
