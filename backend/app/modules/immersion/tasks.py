@@ -5,7 +5,7 @@ from uuid import UUID
 
 from sqlalchemy import select
 
-from app.core.database import SessionLocal
+from app.core.database import SessionLocal, engine
 from app.core.tasks import celery_app
 from app.models import ImportJobRecord, JobEvent
 
@@ -19,26 +19,29 @@ STEPS = [
 
 
 async def _advance(job_id: UUID, request_id: str | None) -> str:
-    async with SessionLocal() as session:
-        job = await session.scalar(select(ImportJobRecord).where(ImportJobRecord.id == job_id))
-        if job is None:
-            return "missing"
-        if job.status in {"ready", "failed", "cancelled"}:
-            return job.status
-        index = next((i for i, step in enumerate(STEPS) if step[0] == job.status), -1)
-        next_status, progress, message = STEPS[min(index + 1, len(STEPS) - 1)]
-        job.status, job.progress = next_status, progress
-        session.add(
-            JobEvent(
-                job_id=job.id,
-                status=next_status,
-                progress=progress,
-                message=message,
-                request_id=request_id,
+    try:
+        async with SessionLocal() as session:
+            job = await session.scalar(select(ImportJobRecord).where(ImportJobRecord.id == job_id))
+            if job is None:
+                return "missing"
+            if job.status in {"ready", "failed", "cancelled"}:
+                return job.status
+            index = next((i for i, step in enumerate(STEPS) if step[0] == job.status), -1)
+            next_status, progress, message = STEPS[min(index + 1, len(STEPS) - 1)]
+            job.status, job.progress = next_status, progress
+            session.add(
+                JobEvent(
+                    job_id=job.id,
+                    status=next_status,
+                    progress=progress,
+                    message=message,
+                    request_id=request_id,
+                )
             )
-        )
-        await session.commit()
-        return next_status
+            await session.commit()
+            return next_status
+    finally:
+        await engine.dispose()
 
 
 @celery_app.task(
