@@ -5,7 +5,7 @@
 | 里程碑 | 状态 | 当前证据 / 下一步 |
 | --- | --- | --- |
 | M0 基线 | 完成 | 已记录 FreeLingo 固定 SHA `d2d16c6c3cd1c1167dbc3f21f7776c09f933eae2`；仅作为参考，不直接混入已排除的商业与社区功能。 |
-| M1 基础 | 进行中 | Compose、Nginx 示例、健康检查、配置已建立；待 Owner CLI、真实 migration 与部署验收。 |
+| M1 基础 | 进行中 | Compose、Nginx 示例、健康检查、Owner CLI、真实 PostgreSQL migration、登录与 Refresh Cookie 轮换已在本机验收；待部署环境验收。 |
 | M2 响应式壳 | 完成 | 375/768/1280 浏览器实测无横向溢出，浅深主题与三种导航均可用。 |
 | M3–M9 学习能力 | 进行中 | 已有导入、听写、写作、角色扮演的 API/UI 基线；待接入持久化、外部 Provider、媒体与完整学习闭环。 |
 | M10 加固与部署 | 未开始 | 待 Docker、CI、备份恢复、服务器资源与最终 E2E 验收。 |
