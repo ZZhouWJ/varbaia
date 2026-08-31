@@ -31,3 +31,16 @@ infra/     生产部署示例（复用宿主 Nginx）
 ```
 
 所有媒体处理和 AI 能力均通过可替换的外部服务提供商接口接入；本仓库不会提交任何服务密钥。
+
+## 后续部署（暂不执行）
+
+服务器部署时，复制 `backend/.env.example` 为 `backend/.env`，复制
+`infra/.env.example` 为 `infra/.env` 并填写强密码与外部 AI Provider 密钥。确认
+宿主 Nginx 已存在后，在 `infra/` 中执行：
+
+```bash
+docker compose --env-file .env up -d --build
+```
+
+该编排仅在 `127.0.0.1` 暴露前后端端口，再由既有 Nginx 反向代理；不会额外占用
+80/443 端口。
