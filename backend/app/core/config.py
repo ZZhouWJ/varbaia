@@ -17,6 +17,9 @@ class Settings(BaseSettings):
     access_token_minutes: int = 15
     refresh_token_days: int = 14
     allow_registration: bool = False
+    ai_provider: str = "external"
+    ai_api_base_url: str = ""
+    ai_api_key: str = ""
 
     @property
     def allowed_origins(self) -> list[str]:
