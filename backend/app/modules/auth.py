@@ -126,7 +126,21 @@ async def refresh(
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
-async def logout(response: Response, owner: User = Depends(get_owner)) -> Response:
-    del owner
+async def logout(
+    response: Response,
+    owner: User = Depends(get_owner),
+    session: AsyncSession = Depends(get_session),
+    varbaia_refresh: str | None = Cookie(default=None),
+) -> Response:
+    if varbaia_refresh:
+        record = await session.scalar(
+            select(RefreshSession).where(
+                RefreshSession.owner_user_id == owner.id,
+                RefreshSession.token_hash == hash_refresh_token(varbaia_refresh),
+            )
+        )
+        if record and record.revoked_at is None:
+            record.revoked_at = datetime.now(UTC)
+            await session.commit()
     response.delete_cookie("varbaia_refresh", path="/api/auth")
     return response
