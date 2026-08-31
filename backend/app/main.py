@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api import router
 from app.core.config import get_settings
 from app.modules.auth import router as auth_router
+from app.modules.immersion.persistent_api import router as persistent_immersion_router
 
 
 def create_app() -> FastAPI:
@@ -18,6 +19,7 @@ def create_app() -> FastAPI:
     )
     app.include_router(router)
     app.include_router(auth_router, prefix="/api")
+    app.include_router(persistent_immersion_router, prefix="/api")
     return app
 
 

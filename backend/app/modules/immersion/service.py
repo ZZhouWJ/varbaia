@@ -28,6 +28,12 @@ class ImmersionService:
         self.segments: dict[UUID, list[TranscriptSegment]] = defaultdict(list)
 
     def create_import(self, payload: VideoImportRequest) -> ImportJob:
+        self.validate_source_url(payload)
+        job = ImportJob(source_url=payload.source_url)
+        self.jobs[job.id] = job
+        return job
+
+    def validate_source_url(self, payload: VideoImportRequest) -> None:
         hostname = (urlparse(str(payload.source_url)).hostname or "").lower()
         try:
             address = ipaddress.ip_address(hostname)
@@ -47,9 +53,6 @@ class ImmersionService:
                 status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                 detail="该视频来源不在允许列表中",
             )
-        job = ImportJob(source_url=payload.source_url)
-        self.jobs[job.id] = job
-        return job
 
     def advance_import(self, job_id: UUID) -> ImportJob:
         job = self.get_job(job_id)
