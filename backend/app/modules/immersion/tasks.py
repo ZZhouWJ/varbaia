@@ -50,4 +50,7 @@ async def _advance(job_id: UUID, request_id: str | None) -> str:
 )
 def import_media(self, job_id: str, request_id: str | None = None) -> str:
     """Advance one idempotent stage; production adapters perform media work per stage."""
-    return asyncio.run(_advance(UUID(job_id), request_id))
+    next_status = asyncio.run(_advance(UUID(job_id), request_id))
+    if next_status not in {"missing", "ready", "failed", "cancelled"}:
+        import_media.apply_async(args=[job_id, request_id], countdown=1)
+    return next_status
