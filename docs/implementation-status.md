@@ -11,3 +11,9 @@
 | M10 加固与部署 | 未开始 | 待 Docker、CI、备份恢复、服务器资源与最终 E2E 验收。 |
 
 不得将“页面可演示”视为项目完成；所有 Definition of Done 条目需逐项提供运行证据。
+
+## Definition of Done 审计（2026-08-31）
+
+已具备运行证据：单 Owner 创建/登录/刷新/退出基础，PostgreSQL migration，Redis + Celery 状态链，URL SSRF 防护，磁盘预算规则，响应式壳、浅深主题、焦点与 Reduced Motion，前后端基础测试与构建。
+
+尚未完成，不能作为发布条件：真实媒体下载/上传与清理、外部英语 STT、完整视频 Range 与字幕/断点播放、真实麦克风录音与 Provider 发音评分、视频语音 Role Play、Writing/Vocabulary/Progress/Learner Memory 持久化闭环、Docker build 与从空目录部署、核心 E2E、真实外部 AI/Speech Provider 集成。后续开发和最终邮件均以这些项目完成并取得运行证据为前提。
