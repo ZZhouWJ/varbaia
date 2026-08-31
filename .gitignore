@@ -1,0 +1,24 @@
+# Editor temporary files
+*.swp
+*.swo
+
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+
+# Frontend artifacts
+node_modules/
+.next/
+coverage/
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+
+# Runtime data
+data/
