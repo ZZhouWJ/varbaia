@@ -36,3 +36,17 @@ class ImportJobRecord(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC)
     )
+
+
+class JobEvent(Base):
+    __tablename__ = "job_events"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    job_id: Mapped[UUID] = mapped_column(ForeignKey("import_jobs.id"), index=True)
+    status: Mapped[str] = mapped_column(String(40))
+    progress: Mapped[int] = mapped_column(Integer)
+    message: Mapped[str] = mapped_column(String(280))
+    request_id: Mapped[str | None] = mapped_column(String(100))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC)
+    )

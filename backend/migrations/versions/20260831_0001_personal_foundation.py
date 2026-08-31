@@ -40,8 +40,20 @@ def upgrade() -> None:
     op.create_index(
         "ix_import_jobs_idempotency_key", "import_jobs", ["idempotency_key"], unique=True
     )
+    op.create_table(
+        "job_events",
+        sa.Column("id", sa.Uuid(), primary_key=True),
+        sa.Column("job_id", sa.Uuid(), sa.ForeignKey("import_jobs.id"), nullable=False),
+        sa.Column("status", sa.String(40), nullable=False),
+        sa.Column("progress", sa.Integer(), nullable=False),
+        sa.Column("message", sa.String(280), nullable=False),
+        sa.Column("request_id", sa.String(100)),
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+    )
+    op.create_index("ix_job_events_job_id", "job_events", ["job_id"])
 
 
 def downgrade() -> None:
+    op.drop_table("job_events")
     op.drop_table("import_jobs")
     op.drop_table("users")
