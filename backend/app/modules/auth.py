@@ -32,6 +32,13 @@ def enforce_login_rate_limit(key: str) -> None:
     login_attempts[key] = attempts
 
 
+def enforce_cookie_origin(request: Request, settings: Settings) -> None:
+    """Permit non-browser clients while rejecting cross-site cookie requests."""
+    origin = request.headers.get("origin")
+    if origin and origin not in settings.allowed_origins:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="不允许的请求来源")
+
+
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str = Field(min_length=12, max_length=256)
@@ -71,10 +78,11 @@ async def issue_session(
         key="varbaia_refresh",
         value=raw_refresh,
         httponly=True,
-        secure=settings.app_env == "production",
-        samesite="lax",
+        secure=settings.cookie_secure or settings.app_env == "production",
+        samesite=settings.cookie_samesite,
         max_age=settings.refresh_token_days * 86400,
         path="/api/auth",
+        domain=settings.cookie_domain or None,
     )
     return TokenResponse(access_token=create_access_token(user.id, settings))
 
@@ -87,6 +95,7 @@ async def login(
     session: AsyncSession = Depends(get_session),
     settings: Settings = Depends(get_settings),
 ) -> TokenResponse:
+    enforce_cookie_origin(request, settings)
     enforce_login_rate_limit(
         f"{request.client.host if request.client else 'unknown'}:{payload.email}"
     )
@@ -102,12 +111,14 @@ async def login(
 
 @router.post("/refresh", response_model=TokenResponse)
 async def refresh(
+    request: Request,
     response: Response,
     session: AsyncSession = Depends(get_session),
     settings: Settings = Depends(get_settings),
     varbaia_refresh: str | None = Cookie(default=None),
 ) -> TokenResponse:
     # Cookie extraction remains explicit to keep tests and alternate clients deterministic.
+    enforce_cookie_origin(request, settings)
     if not varbaia_refresh:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh 会话不存在")
     record = await session.scalar(
@@ -127,11 +138,14 @@ async def refresh(
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
 async def logout(
+    request: Request,
     response: Response,
     owner: User = Depends(get_owner),
     session: AsyncSession = Depends(get_session),
     varbaia_refresh: str | None = Cookie(default=None),
+    settings: Settings = Depends(get_settings),
 ) -> Response:
+    enforce_cookie_origin(request, settings)
     if varbaia_refresh:
         record = await session.scalar(
             select(RefreshSession).where(
@@ -142,5 +156,7 @@ async def logout(
         if record and record.revoked_at is None:
             record.revoked_at = datetime.now(UTC)
             await session.commit()
-    response.delete_cookie("varbaia_refresh", path="/api/auth")
+    response.delete_cookie(
+        "varbaia_refresh", path="/api/auth", domain=settings.cookie_domain or None
+    )
     return response

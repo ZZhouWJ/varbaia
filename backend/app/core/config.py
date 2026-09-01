@@ -1,4 +1,5 @@
 from functools import lru_cache
+from typing import Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -18,6 +19,9 @@ class Settings(BaseSettings):
     jwt_secret: str = "local-development-only-change-before-deploy"
     access_token_minutes: int = 15
     refresh_token_days: int = 14
+    cookie_domain: str = ""
+    cookie_secure: bool = False
+    cookie_samesite: Literal["lax", "strict", "none"] = "lax"
     allow_registration: bool = False
     ai_provider: str = "external"
     ai_api_base_url: str = ""

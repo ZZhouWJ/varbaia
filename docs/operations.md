@@ -3,7 +3,7 @@
 ## 部署前检查
 
 1. 安装 Docker Compose v2，并确认宿主 Nginx 已占用并管理 80/443。
-2. 在仓库根目录复制 `backend/.env.example` 为 `.env`，设置 32 字符以上的 `JWT_SECRET`、外部 AI Provider 配置、腾讯云凭据（`TENCENTCLOUD_SECRET_ID`、`TENCENTCLOUD_SECRET_KEY`、`TENCENTCLOUD_APP_ID`、英语 ASR / TTS 参数）和位于服务器外部挂载位置的 `BACKUP_DESTINATION`；根目录 `.env` 是本地与 Compose 唯一读取的私密配置文件。
+2. 在仓库根目录复制 `backend/.env.example` 为 `.env`，设置 32 字符以上的 `JWT_SECRET`、`COOKIE_DOMAIN`、生产环境 `COOKIE_SECURE=true`、外部 AI Provider 配置、腾讯云凭据（`TENCENTCLOUD_SECRET_ID`、`TENCENTCLOUD_SECRET_KEY`、`TENCENTCLOUD_APP_ID`、英语 ASR / TTS 参数）和位于服务器外部挂载位置的 `BACKUP_DESTINATION`；根目录 `.env` 是本地与 Compose 唯一读取的私密配置文件。
 3. 复制 `infra/.env.example` 为 `infra/.env`，设置强随机 `POSTGRES_PASSWORD`。
 4. 在 `infra/` 执行 `docker compose --env-file ../.env up -d --build`；Backend 会先执行
    `alembic upgrade head`，端口必须只绑定 `127.0.0.1`。
