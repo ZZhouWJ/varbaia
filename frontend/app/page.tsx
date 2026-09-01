@@ -30,6 +30,9 @@ import {
   getTranscript,
   getRolePlaySession,
   getRolePlayAudioUrl,
+  listLearnerMemory,
+  markLearnerMemoryMastered,
+  deleteLearnerMemory,
   getPronunciationAttempt,
   getWritingAttempt,
   createRolePlaySession,
@@ -48,6 +51,7 @@ import {
   type DictationResult,
   type ImportEvent,
   type ImportJob,
+  type LearnerMemoryItem,
   type RolePlaySession,
   type TranscriptSegment,
   type WritingAttempt,
@@ -95,6 +99,7 @@ export default function Home() {
   const [writing, setWriting] = useState<WritingAttempt | null>(null);
   const [writingDraft, setWritingDraft] = useState("");
   const [vocabulary, setVocabulary] = useState<VocabularyItem[]>([]);
+  const [learnerMemory, setLearnerMemory] = useState<LearnerMemoryItem[]>([]);
   const [shadowingOpen, setShadowingOpen] = useState(false);
   const [recording, setRecording] = useState(false);
   const [recordedAudio, setRecordedAudio] = useState<Blob | null>(null);
@@ -120,6 +125,11 @@ export default function Home() {
     listVocabularyItems().then(setVocabulary).catch((error: unknown) => {
       notify(error instanceof Error ? error.message : "无法读取词库");
     });
+  }, [signedIn]);
+
+  useEffect(() => {
+    if (!signedIn) return;
+    listLearnerMemory().then(setLearnerMemory).catch(() => undefined);
   }, [signedIn]);
 
   useEffect(() => {
@@ -294,6 +304,20 @@ export default function Home() {
     } catch (error) { notify(error instanceof Error ? error.message : "保存复习结果失败"); }
   }
 
+  async function masterLearnerMemory(item: LearnerMemoryItem) {
+    try {
+      await markLearnerMemoryMastered(item.id);
+      setLearnerMemory((items) => items.filter((current) => current.id !== item.id));
+    } catch (error) { notify(error instanceof Error ? error.message : "更新学习记忆失败"); }
+  }
+
+  async function removeLearnerMemory(item: LearnerMemoryItem) {
+    try {
+      await deleteLearnerMemory(item.id);
+      setLearnerMemory((items) => items.filter((current) => current.id !== item.id));
+    } catch (error) { notify(error instanceof Error ? error.message : "删除学习记忆失败"); }
+  }
+
   async function toggleRecording() {
     if (recorderRef.current?.state === "recording") { recorderRef.current.stop(); return; }
     try {
@@ -368,6 +392,7 @@ export default function Home() {
         </section>
 
         {signedIn && <section className="vocabulary-panel" aria-labelledby="vocabulary-title"><div className="section-heading"><div><p className="eyebrow">PERSONAL VOCABULARY</p><h2 id="vocabulary-title">我的词库</h2></div><span className="subtle-count">{vocabulary.length} 个词</span></div>{vocabulary.length === 0 ? <p className="form-note">还没有保存的词汇。完成视频学习后可在这里持续复习。</p> : <div className="vocabulary-list">{vocabulary.slice(0, 6).map((item) => <article key={item.id}><div><strong>{item.term}</strong><p>{item.definition}</p><small>已复习 {item.repetitions} 次 · 间隔 {item.interval_days} 天</small></div><div className="review-grades"><button onClick={() => gradeVocabulary(item, "again")}>重来</button><button onClick={() => gradeVocabulary(item, "hard")}>困难</button><button onClick={() => gradeVocabulary(item, "good")}>掌握</button><button onClick={() => gradeVocabulary(item, "easy")}>简单</button></div></article>)}</div>}</section>}
+        {signedIn && <section className="memory-panel" aria-labelledby="memory-title"><div className="section-heading"><div><p className="eyebrow">LEARNER MEMORY</p><h2 id="memory-title">下一步重点</h2></div><span className="subtle-count">{learnerMemory.length} 项</span></div>{learnerMemory.length === 0 ? <p className="form-note">继续练习；重复出现的关键能力缺口会显示在这里。</p> : <div className="memory-list">{learnerMemory.map((item) => <article key={item.id}><div><span className="memory-category">{item.category}</span><strong>{item.title}</strong><p>{item.detail}</p><small>来自 {item.source_type} · 已出现 {item.occurrence_count} 次</small></div><div className="review-grades"><button onClick={() => masterLearnerMemory(item)}>已掌握</button><button onClick={() => removeLearnerMemory(item)}>删除</button></div></article>)}</div>}</section>}
 
         <section className="review-panel" aria-labelledby="dictation-title">
           <div><p className="eyebrow">QUICK CHECK</p><h2 id="dictation-title">听写一句</h2><p className="quote">“The best way to learn is to stay curious.”</p><button className="sound-button" onClick={() => notify("正在播放示范音频。")}><Volume2 size={17} /> 播放 0:06</button></div>

@@ -125,6 +125,7 @@ export async function saveVideoProgress(jobId: string, positionSeconds: number, 
 export type DictationResult = { score: number; missed_words: string[]; normalized_answer: string };
 export type VocabularyItem = { id: string; term: string; definition: string; interval_days: number; ease: number; repetitions: number; next_review_at: string };
 export type PronunciationAttempt = { id: string; reference_text: string; evaluation_status: string; result: Record<string, unknown> | null; evaluation_error: string | null };
+export type LearnerMemoryItem = { id: string; category: "pronunciation" | "listening" | "vocabulary" | "grammar" | "fluency" | "writing"; title: string; detail: string; source_type: string; occurrence_count: number; severity: number; status: string; last_seen_at: string };
 export type RolePlaySession = { id: string; scenario: string; status: string; messages: Array<{ id: string; speaker: string; content: string; coaching_tip: string | null; audio_available: boolean }> };
 export type WritingAttempt = {
   id: string;
@@ -202,6 +203,23 @@ export async function listVocabularyItems(): Promise<VocabularyItem[]> {
   const response = await ownerFetch("/owner/vocabulary/items");
   if (!response.ok) throw new Error((await response.json()).detail ?? "读取词库失败");
   return response.json();
+}
+
+export async function listLearnerMemory(): Promise<LearnerMemoryItem[]> {
+  const response = await ownerFetch("/owner/memory");
+  if (!response.ok) throw new Error((await response.json()).detail ?? "读取学习记忆失败");
+  return response.json();
+}
+
+export async function markLearnerMemoryMastered(memoryId: string): Promise<LearnerMemoryItem> {
+  const response = await ownerFetch(`/owner/memory/${memoryId}/master`, { method: "POST" });
+  if (!response.ok) throw new Error((await response.json()).detail ?? "更新学习记忆失败");
+  return response.json();
+}
+
+export async function deleteLearnerMemory(memoryId: string): Promise<void> {
+  const response = await ownerFetch(`/owner/memory/${memoryId}`, { method: "DELETE" });
+  if (!response.ok) throw new Error((await response.json()).detail ?? "删除学习记忆失败");
 }
 
 export async function reviewVocabulary(itemId: string, grade: "again" | "hard" | "good" | "easy"): Promise<VocabularyItem> {
