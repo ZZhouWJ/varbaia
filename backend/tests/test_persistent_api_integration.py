@@ -16,6 +16,7 @@ from app.core.database import SessionLocal, engine
 from app.core.security import create_access_token
 from app.main import app
 from app.models import (
+    DictationAttempt,
     ImportJobRecord,
     MediaAsset,
     ProgressRecord,
@@ -326,5 +327,44 @@ async def test_owner_can_replace_and_read_transcript_segments() -> None:
                 )
             )
             await session.execute(delete(ImportJobRecord).where(ImportJobRecord.id == job.id))
+            await session.execute(delete(User).where(User.id == user.id))
+            await session.commit()
+
+
+@pytest.mark.asyncio
+async def test_owner_can_submit_persistent_dictation_attempt() -> None:
+    user = User(
+        email=f"dictation-{uuid4()}@example.com",
+        password_hash=PasswordHasher().hash("long-test-password"),
+    )
+    async with SessionLocal() as session:
+        session.add(user)
+        await session.commit()
+        await session.refresh(user)
+    headers = {"Authorization": f"Bearer {create_access_token(user.id)}"}
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            result = await client.post(
+                "/api/owner/dictation/attempts",
+                headers=headers,
+                json={
+                    "answer": "Learning takes practice",
+                    "reference": "Learning takes daily practice",
+                },
+            )
+            assert result.status_code == 201
+            assert result.json()["score"] == 75
+            assert result.json()["missed_words"] == ["daily"]
+        async with SessionLocal() as session:
+            attempt = await session.scalar(
+                select(DictationAttempt).where(DictationAttempt.owner_user_id == user.id)
+            )
+            assert attempt is not None
+            assert attempt.score == 75
+    finally:
+        async with SessionLocal() as session:
+            await session.execute(
+                delete(DictationAttempt).where(DictationAttempt.owner_user_id == user.id)
+            )
             await session.execute(delete(User).where(User.id == user.id))
             await session.commit()
