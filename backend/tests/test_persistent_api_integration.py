@@ -28,6 +28,7 @@ from app.models import (
     WritingAttempt,
 )
 from app.modules.writing_tasks import evaluate_writing
+from app.providers.ai import WritingEvaluation
 
 
 @pytest.fixture(autouse=True)
@@ -72,7 +73,17 @@ async def test_owner_can_create_and_read_persistent_import() -> None:
 
 
 @pytest.mark.asyncio
-async def test_owner_can_save_and_read_writing_attempt() -> None:
+async def test_owner_can_save_and_read_writing_attempt(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def fake_evaluate_writing(_self: object, _prompt: str, _draft: str) -> WritingEvaluation:
+        return WritingEvaluation(
+            clarity_score=88,
+            corrected_draft="I travelled by train.",
+            suggestions=["Add one specific detail."],
+        )
+
+    monkeypatch.setattr(
+        "app.providers.ai.ExternalHttpProvider.evaluate_writing", fake_evaluate_writing
+    )
     user = User(
         email=f"writing-{uuid4()}@example.com",
         password_hash=PasswordHasher().hash("long-test-password"),
@@ -95,14 +106,14 @@ async def test_owner_can_save_and_read_writing_attempt() -> None:
             result = await asyncio.to_thread(
                 evaluate_writing.apply, args=[created.json()["id"]]
             )
-            assert result.result == "failed"
+            assert result.result == "complete"
             found = await client.get(
                 f"/api/owner/writing/attempts/{created.json()['id']}", headers=headers
             )
             assert found.status_code == 200
             assert found.json()["draft"] == "I travelled by train."
-            assert found.json()["evaluation_status"] == "failed"
-            assert "未配置外部 AI Provider" in found.json()["evaluation_error"]
+            assert found.json()["evaluation_status"] == "complete"
+            assert found.json()["clarity_score"] == 88
     finally:
         async with SessionLocal() as session:
             await session.execute(
@@ -235,6 +246,67 @@ async def test_owner_can_create_role_play_session_and_turn() -> None:
             )
             await session.execute(delete(User).where(User.id == user.id))
             await session.commit()
+
+
+@pytest.mark.asyncio
+async def test_owner_can_read_only_own_role_play_tts_audio() -> None:
+    owner = User(
+        email=f"role-audio-owner-{uuid4()}@example.com",
+        password_hash=PasswordHasher().hash("long-test-password"),
+    )
+    other = User(
+        email=f"role-audio-other-{uuid4()}@example.com",
+        password_hash=PasswordHasher().hash("long-test-password"),
+    )
+    stored_name = f"role-play-integration-{uuid4()}.wav"
+    root = Path(get_settings().media_root)
+    root.mkdir(parents=True, exist_ok=True)
+    (root / stored_name).write_bytes(b"RIFFfixture-wav")
+    try:
+        async with SessionLocal() as session:
+            session.add_all([owner, other])
+            await session.commit()
+            await session.refresh(owner)
+            await session.refresh(other)
+            role_session = RolePlaySession(owner_user_id=owner.id, scenario="Ordering coffee")
+            session.add(role_session)
+            await session.commit()
+            await session.refresh(role_session)
+            message = RolePlayMessage(
+                session_id=role_session.id,
+                speaker="assistant",
+                content="Hello, what would you like?",
+                coaching_tip="Use a polite request.",
+                audio_stored_name=stored_name,
+                audio_mime_type="audio/wav",
+            )
+            session.add(message)
+            await session.commit()
+            await session.refresh(message)
+        owner_headers = {"Authorization": f"Bearer {create_access_token(owner.id)}"}
+        other_headers = {"Authorization": f"Bearer {create_access_token(other.id)}"}
+        url = f"/api/owner/role-play/sessions/{role_session.id}/messages/{message.id}/audio"
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            found = await client.get(url, headers=owner_headers)
+            assert found.status_code == 200
+            assert found.headers["content-type"] == "audio/wav"
+            assert found.content == b"RIFFfixture-wav"
+            denied = await client.get(url, headers=other_headers)
+            assert denied.status_code == 404
+    finally:
+        async with SessionLocal() as session:
+            session_ids = select(RolePlaySession.id).where(
+                RolePlaySession.owner_user_id.in_([owner.id, other.id])
+            )
+            await session.execute(
+                delete(RolePlayMessage).where(RolePlayMessage.session_id.in_(session_ids))
+            )
+            await session.execute(
+                delete(RolePlaySession).where(RolePlaySession.id.in_(session_ids))
+            )
+            await session.execute(delete(User).where(User.id.in_([owner.id, other.id])))
+            await session.commit()
+        (root / stored_name).unlink(missing_ok=True)
 
 
 @pytest.mark.asyncio
