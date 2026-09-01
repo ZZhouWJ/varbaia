@@ -41,7 +41,7 @@ class ExternalHttpProvider:
         if not self.base_url or not self.api_key:
             raise RuntimeError("未配置外部 AI Provider，无法执行写作评价。")
         payload = {
-            "model": "configured-by-provider",
+            "model": self.settings.ai_model or "configured-by-provider",
             "messages": [
                 {
                     "role": "system",
@@ -90,7 +90,7 @@ class ExternalHttpProvider:
         if not self.base_url or not self.api_key:
             raise RuntimeError("未配置外部 AI Provider，无法执行角色扮演。")
         payload = {
-            "model": "configured-by-provider",
+            "model": self.settings.ai_model or "configured-by-provider",
             "messages": [
                 {
                     "role": "system",

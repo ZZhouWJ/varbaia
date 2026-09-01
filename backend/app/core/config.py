@@ -4,7 +4,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=("../.env", ".env"), env_file_encoding="utf-8", extra="ignore"
+    )
 
     app_name: str = "Verbaia API"
     app_env: str = "development"
@@ -20,8 +22,15 @@ class Settings(BaseSettings):
     ai_provider: str = "external"
     ai_api_base_url: str = ""
     ai_api_key: str = ""
+    ai_model: str = ""
     pronunciation_api_url: str = ""
     pronunciation_api_key: str = ""
+    tencentcloud_secret_id: str = ""
+    tencentcloud_secret_key: str = ""
+    tencentcloud_region: str = ""
+    tencentcloud_app_id: str = ""
+    tencentcloud_asr_engine_model_type: str = ""
+    tencentcloud_tts_voice_type: str = ""
     media_root: str = "./data/media"
     max_upload_mb: int = 500
 

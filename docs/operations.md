@@ -3,9 +3,9 @@
 ## 部署前检查
 
 1. 安装 Docker Compose v2，并确认宿主 Nginx 已占用并管理 80/443。
-2. 在仓库根目录复制 `backend/.env.example` 为 `backend/.env`，设置 32 字符以上的 `JWT_SECRET`、外部 AI Provider URL 和密钥。
+2. 在仓库根目录复制 `backend/.env.example` 为 `.env`，设置 32 字符以上的 `JWT_SECRET`、外部 AI Provider 配置和密钥；根目录 `.env` 是本地与 Compose 唯一读取的私密配置文件。
 3. 复制 `infra/.env.example` 为 `infra/.env`，设置强随机 `POSTGRES_PASSWORD`。
-4. 在 `infra/` 执行 `docker compose --env-file .env up -d --build`；Backend 会先执行
+4. 在 `infra/` 执行 `docker compose --env-file ../.env up -d --build`；Backend 会先执行
    `alembic upgrade head`，端口必须只绑定 `127.0.0.1`。
 5. 将 `infra/nginx/varbaia.conf.example` 的域名改为实际域名，测试并 reload 已有 Nginx。
 6. 使用 `docker compose ps` 和 `curl http://127.0.0.1:8000/api/health` 检查服务；创建 Owner 后再开放登录。
