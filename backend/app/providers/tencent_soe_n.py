@@ -45,7 +45,7 @@ def signed_soe_n_handshake_target(
     settings: Settings,
     *,
     timestamp: int | None = None,
-    nonce: int = 0,
+    nonce: int | None = None,
     voice_id: str | None = None,
 ) -> SoeNHandshakeTarget:
     """Build the SOE-N HMAC-SHA1 signed WebSocket handshake URL."""
@@ -53,6 +53,9 @@ def signed_soe_n_handshake_target(
     if not settings.tencentcloud_secret_id or not settings.tencentcloud_secret_key:
         raise RuntimeError("未配置腾讯云密钥，无法签名 SOE-N WebSocket 请求。")
     now = int(time.time()) if timestamp is None else timestamp
+    current_nonce = now if nonce is None else nonce
+    if current_nonce <= 0 or len(str(current_nonce)) > 10:
+        raise ValueError("SOE-N nonce 必须是最长 10 位的正整数。")
     current_voice_id = voice_id or str(uuid4())
     if not current_voice_id or len(current_voice_id) > 128:
         raise ValueError("SOE-N voice_id 必须为 1 到 128 个字符。")
@@ -60,7 +63,7 @@ def signed_soe_n_handshake_target(
         "eval_mode": "1",
         "expired": str(now + 3600),
         "keyword": "",
-        "nonce": str(nonce),
+        "nonce": str(current_nonce),
         "rec_mode": "0",
         "ref_text": "hello world",
         "score_coeff": "1.0",

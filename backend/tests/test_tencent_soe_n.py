@@ -92,6 +92,24 @@ def test_soe_n_rejects_overlong_voice_id() -> None:
         raise AssertionError("expected voice_id length validation")
 
 
+def test_soe_n_nonce_defaults_to_timestamp_and_rejects_invalid_values() -> None:
+    settings = Settings(
+        _env_file=None,
+        tencentcloud_app_id="123456",
+        tencentcloud_secret_id="secret-id",
+        tencentcloud_secret_key="private-key",
+    )
+    target = signed_soe_n_handshake_target(settings, timestamp=1234567890, voice_id="voice")
+    assert dict(target.signature_params)["nonce"] == "1234567890"
+    for invalid_nonce in (0, -1, 10_000_000_000):
+        try:
+            signed_soe_n_handshake_target(settings, timestamp=100, nonce=invalid_nonce)
+        except ValueError as exc:
+            assert "nonce" in str(exc)
+        else:
+            raise AssertionError("expected nonce validation")
+
+
 def test_soe_n_matches_independent_official_sdk_reference() -> None:
     settings = Settings(
         _env_file=None,
