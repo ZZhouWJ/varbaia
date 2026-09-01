@@ -23,3 +23,17 @@ async def test_ready_returns_service_unavailable_without_database() -> None:
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         ready = await client.get("/api/health/ready")
         assert ready.status_code == 503
+
+
+@pytest.mark.asyncio
+async def test_cors_allows_owner_refresh_cookie_for_allowed_origin() -> None:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.options(
+            "/api/auth/login",
+            headers={
+                "Origin": "http://localhost:3000",
+                "Access-Control-Request-Method": "POST",
+            },
+        )
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-credentials"] == "true"
