@@ -1,15 +1,17 @@
 import shutil
+from datetime import datetime
 from pathlib import Path
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, File, HTTPException, Request, Response, UploadFile, status
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.core.database import get_session
-from app.models import ImportJobRecord, MediaAsset, TranscriptSegmentRecord, User
+from app.models import ImportJobRecord, JobEvent, MediaAsset, TranscriptSegmentRecord, User
 from app.modules.auth import get_owner
 from app.modules.immersion.media import (
     iter_bytes,
@@ -33,12 +35,18 @@ VIDEO_SUFFIXES = {".mp4", ".webm", ".mov", ".m4v"}
 
 
 def to_schema(record: ImportJobRecord) -> ImportJob:
+    if record.status == "ready":
+        message = "学习材料已就绪"
+    elif record.status == "failed":
+        message = "导入失败，请查看任务事件"
+    else:
+        message = "任务处理中"
     return ImportJob(
         id=record.id,
         source_url=record.source_url,
         status=record.status,
         progress=record.progress,
-        message="任务处理中" if record.status != "ready" else "学习材料已就绪",
+        message=message,
         created_at=record.created_at,
     )
 
@@ -89,6 +97,28 @@ async def get_persistent_import(
     if job is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="未找到导入任务")
     return to_schema(job)
+
+
+class ImportEventResponse(BaseModel):
+    status: str
+    progress: int
+    message: str
+    created_at: datetime
+
+
+@router.get("/imports/{job_id}/events", response_model=list[ImportEventResponse])
+async def list_import_events(
+    job_id: UUID,
+    owner: User = Depends(get_owner),
+    session: AsyncSession = Depends(get_session),
+) -> list[ImportEventResponse]:
+    await get_owned_import(job_id, owner.id, session)
+    events = (
+        await session.scalars(
+            select(JobEvent).where(JobEvent.job_id == job_id).order_by(JobEvent.created_at)
+        )
+    ).all()
+    return [ImportEventResponse.model_validate(event, from_attributes=True) for event in events]
 
 
 async def get_owned_import(job_id: UUID, owner_id: UUID, session: AsyncSession) -> ImportJobRecord:
