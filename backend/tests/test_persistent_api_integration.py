@@ -21,6 +21,7 @@ from app.models import (
     ProgressRecord,
     RolePlayMessage,
     RolePlaySession,
+    TranscriptSegmentRecord,
     User,
     VocabularyItem,
     WritingAttempt,
@@ -278,3 +279,52 @@ async def test_owner_can_upload_and_range_stream_media() -> None:
             await session.commit()
         if stored_name:
             (Path(get_settings().media_root) / stored_name).unlink(missing_ok=True)
+
+
+@pytest.mark.asyncio
+async def test_owner_can_replace_and_read_transcript_segments() -> None:
+    user = User(
+        email=f"transcript-{uuid4()}@example.com",
+        password_hash=PasswordHasher().hash("long-test-password"),
+    )
+    async with SessionLocal() as session:
+        session.add(user)
+        await session.commit()
+        await session.refresh(user)
+        job = ImportJobRecord(owner_user_id=user.id, source_url="https://www.youtube.com/watch?v=fixture")
+        session.add(job)
+        await session.commit()
+        await session.refresh(job)
+    headers = {"Authorization": f"Bearer {create_access_token(user.id)}"}
+    payload = {
+        "segments": [
+            {"start_ms": 0, "end_ms": 1200, "text": "Welcome back.", "order": 0},
+            {"start_ms": 1200, "end_ms": 2600, "text": "Let us practise English.", "order": 1},
+        ]
+    }
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            saved = await client.put(
+                f"/api/owner/immersion/imports/{job.id}/transcript",
+                headers=headers,
+                json=payload,
+            )
+            assert saved.status_code == 200
+            found = await client.get(
+                f"/api/owner/immersion/imports/{job.id}/transcript", headers=headers
+            )
+            assert found.status_code == 200
+            assert [item["text"] for item in found.json()] == [
+                "Welcome back.",
+                "Let us practise English.",
+            ]
+    finally:
+        async with SessionLocal() as session:
+            await session.execute(
+                delete(TranscriptSegmentRecord).where(
+                    TranscriptSegmentRecord.import_job_id == job.id
+                )
+            )
+            await session.execute(delete(ImportJobRecord).where(ImportJobRecord.id == job.id))
+            await session.execute(delete(User).where(User.id == user.id))
+            await session.commit()
