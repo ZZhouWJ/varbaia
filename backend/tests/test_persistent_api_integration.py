@@ -12,7 +12,7 @@ if os.getenv("RUN_DB_TESTS") != "1":
 from app.core.database import SessionLocal, engine
 from app.core.security import create_access_token
 from app.main import app
-from app.models import ImportJobRecord, User, VocabularyItem, WritingAttempt
+from app.models import ImportJobRecord, ProgressRecord, User, VocabularyItem, WritingAttempt
 
 
 @pytest.fixture(autouse=True)
@@ -117,6 +117,49 @@ async def test_owner_can_create_and_review_vocabulary() -> None:
         async with SessionLocal() as session:
             await session.execute(
                 delete(VocabularyItem).where(VocabularyItem.owner_user_id == user.id)
+            )
+            await session.execute(delete(User).where(User.id == user.id))
+            await session.commit()
+
+
+@pytest.mark.asyncio
+async def test_owner_can_save_and_resume_learning_progress() -> None:
+    user = User(
+        email=f"progress-{uuid4()}@example.com",
+        password_hash=PasswordHasher().hash("long-test-password"),
+    )
+    resource_id = uuid4()
+    async with SessionLocal() as session:
+        session.add(user)
+        await session.commit()
+        await session.refresh(user)
+    headers = {"Authorization": f"Bearer {create_access_token(user.id)}"}
+    payload = {
+        "resource_type": "immersion_video",
+        "resource_id": str(resource_id),
+        "completion_percent": 25,
+        "last_position_seconds": 180,
+    }
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            saved = await client.put("/api/owner/progress", headers=headers, json=payload)
+            assert saved.status_code == 200
+            updated = await client.put(
+                "/api/owner/progress",
+                headers=headers,
+                json={**payload, "completion_percent": 80, "last_position_seconds": 600},
+            )
+            assert updated.status_code == 200
+            found = await client.get(
+                f"/api/owner/progress/immersion_video/{resource_id}", headers=headers
+            )
+            assert found.status_code == 200
+            assert found.json()["completion_percent"] == 80
+            assert found.json()["last_position_seconds"] == 600
+    finally:
+        async with SessionLocal() as session:
+            await session.execute(
+                delete(ProgressRecord).where(ProgressRecord.owner_user_id == user.id)
             )
             await session.execute(delete(User).where(User.id == user.id))
             await session.commit()

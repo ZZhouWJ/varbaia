@@ -1,7 +1,7 @@
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -90,5 +90,24 @@ class VocabularyItem(Base):
     ease: Mapped[int] = mapped_column(Integer, default=250)
     repetitions: Mapped[int] = mapped_column(Integer, default=0)
     next_review_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC)
+    )
+
+
+class ProgressRecord(Base):
+    __tablename__ = "progress_records"
+    __table_args__ = (
+        UniqueConstraint(
+            "owner_user_id", "resource_type", "resource_id", name="uq_progress_resource"
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    owner_user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    resource_type: Mapped[str] = mapped_column(String(40))
+    resource_id: Mapped[UUID] = mapped_column(index=True)
+    completion_percent: Mapped[int] = mapped_column(Integer, default=0)
+    last_position_seconds: Mapped[int] = mapped_column(Integer, default=0)
+    updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC)
     )
