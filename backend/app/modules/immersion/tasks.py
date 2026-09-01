@@ -42,6 +42,13 @@ async def _advance(job_id: UUID, request_id: str | None) -> str:
             )
             await session.commit()
             if next_status == "transcribing":
+                existing_transcript = await session.scalar(
+                    select(TranscriptSegmentRecord.id).where(
+                        TranscriptSegmentRecord.import_job_id == job.id
+                    )
+                )
+                if existing_transcript is not None:
+                    return next_status
                 try:
                     provider = ExternalHttpProvider(get_settings())
                     segments = await provider.transcribe_english(job.source_url)

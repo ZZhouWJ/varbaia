@@ -20,6 +20,7 @@ from app.modules.immersion.schemas import (
     VideoImportRequest,
 )
 from app.modules.immersion.service import ImmersionService
+from app.modules.immersion.subtitles import parse_subtitles
 from app.modules.immersion.tasks import import_media
 
 router = APIRouter(prefix="/owner/immersion", tags=["owner-immersion"])
@@ -158,12 +159,22 @@ async def get_transcript(
 async def upload_media(
     request: Request,
     video: UploadFile = File(...),
+    subtitle: UploadFile | None = File(default=None),
     owner: User = Depends(get_owner),
     session: AsyncSession = Depends(get_session),
 ) -> ImportJob:
     suffix = Path(video.filename or "").suffix.lower()
     if suffix not in VIDEO_SUFFIXES or not (video.content_type or "").startswith("video/"):
         raise HTTPException(status_code=422, detail="仅支持 MP4、WebM、MOV 或 M4V 视频上传")
+    subtitle_segments: list[tuple[int, int, str]] = []
+    if subtitle is not None:
+        subtitle_suffix = Path(subtitle.filename or "").suffix.lower()
+        if subtitle_suffix not in {".srt", ".vtt"}:
+            raise HTTPException(status_code=422, detail="仅支持 SRT 或 VTT 字幕上传")
+        raw_subtitle = await subtitle.read(10 * 1024 * 1024 + 1)
+        if len(raw_subtitle) > 10 * 1024 * 1024:
+            raise HTTPException(status_code=413, detail="字幕文件超过大小限制")
+        subtitle_segments = parse_subtitles(raw_subtitle.decode("utf-8", errors="strict"))
     settings = get_settings()
     root = Path(settings.media_root).resolve()
     root.mkdir(parents=True, exist_ok=True)
@@ -201,6 +212,16 @@ async def upload_media(
                 size_bytes=total,
             )
         )
+        session.add_all(
+            TranscriptSegmentRecord(
+                import_job_id=job.id,
+                position=position,
+                start_ms=start_ms,
+                end_ms=end_ms,
+                text=text,
+            )
+            for position, (start_ms, end_ms, text) in enumerate(subtitle_segments)
+        )
         await session.commit()
         await session.refresh(job)
     except Exception:
@@ -208,6 +229,8 @@ async def upload_media(
         raise
     finally:
         await video.close()
+        if subtitle is not None:
+            await subtitle.close()
     import_media.delay(str(job.id), request.headers.get("x-request-id"))
     return to_schema(job)
 
