@@ -77,3 +77,18 @@ class WritingAttempt(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC)
     )
+
+
+class VocabularyItem(Base):
+    __tablename__ = "vocabulary_items"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    owner_user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    term: Mapped[str] = mapped_column(String(160))
+    definition: Mapped[str] = mapped_column(Text)
+    interval_days: Mapped[int] = mapped_column(Integer, default=1)
+    ease: Mapped[int] = mapped_column(Integer, default=250)
+    repetitions: Mapped[int] = mapped_column(Integer, default=0)
+    next_review_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC)
+    )
