@@ -27,17 +27,20 @@ import {
   getImport,
   getImportEvents,
   getRolePlaySession,
+  getWritingAttempt,
   createRolePlaySession,
   listImports,
   login,
   logout,
   submitDictation,
   submitRolePlayTurn,
+  submitWriting,
   uploadMedia,
   type DictationResult,
   type ImportEvent,
   type ImportJob,
   type RolePlaySession,
+  type WritingAttempt,
 } from "../lib/api";
 
 type Section = "今日" | "沉浸" | "复习" | "词库" | "我";
@@ -71,6 +74,10 @@ export default function Home() {
   const [rolePlayOpen, setRolePlayOpen] = useState(false);
   const [rolePlay, setRolePlay] = useState<RolePlaySession | null>(null);
   const [roleMessage, setRoleMessage] = useState("");
+  const [writingOpen, setWritingOpen] = useState(false);
+  const [writing, setWriting] = useState<WritingAttempt | null>(null);
+  const [writingDraft, setWritingDraft] = useState("");
+  const writingPrompt = "Describe one small change that could make your city more liveable.";
 
   useEffect(() => {
     document.documentElement.dataset.theme = dark ? "dark" : "light";
@@ -107,6 +114,16 @@ export default function Home() {
     }, 1800);
     return () => window.clearInterval(timer);
   }, [rolePlay]);
+
+  useEffect(() => {
+    if (!writing || !["queued", "processing"].includes(writing.status)) return;
+    const timer = window.setInterval(() => {
+      getWritingAttempt(writing.id).then(setWriting).catch((error: unknown) => {
+        notify(error instanceof Error ? error.message : "无法读取写作反馈");
+      });
+    }, 1800);
+    return () => window.clearInterval(timer);
+  }, [writing]);
 
   function notify(message: string) {
     setToast(message);
@@ -163,6 +180,14 @@ export default function Home() {
     catch (error) { notify(error instanceof Error ? error.message : "发送失败"); }
   }
 
+  async function sendWriting(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!writingDraft.trim()) return;
+    try {
+      setWriting(await submitWriting(writingPrompt, writingDraft));
+    } catch (error) { notify(error instanceof Error ? error.message : "写作提交失败"); }
+  }
+
   return (
     <main className="app-shell">
       <aside className={`sidebar ${menuOpen ? "sidebar--open" : ""}`} aria-label="主导航">
@@ -208,7 +233,7 @@ export default function Home() {
           <div className="lesson-detail"><div className="lesson-meta"><span className="tag">B1 · en-GB</span><span>上次学习于今天 09:18</span></div><h3>How cities can become more liveable</h3><p>从城市生活议题中练习观点表达与自然连读。</p><div className="progress-line"><span style={{ width: "62%" }} /></div><div className="lesson-bottom"><strong>已完成 62%</strong><button className="outline-button" onClick={() => setActive("沉浸")}>继续 <ChevronRight size={16} /></button></div></div>
         </article>
 
-        <section className="section-heading practice-heading"><div><p className="eyebrow">ONE SENTENCE AT A TIME</p><h2>今日微练习</h2></div><span className="subtle-count">4 个步骤</span></section>
+        <section className="section-heading practice-heading"><div><p className="eyebrow">ONE SENTENCE AT A TIME</p><h2>今日微练习</h2></div><button className="text-button" onClick={() => { setWriting(null); setWritingOpen(true); }}>写作反馈 <ChevronRight size={16} /></button></section>
         <section className="practice-grid">
           {practiceSteps.map((step, index) => {
             const icons = [Headphones, Volume2, Mic2, Send];
@@ -228,6 +253,7 @@ export default function Home() {
       {dialogOpen && <div className="modal-layer" role="dialog" aria-modal="true" aria-labelledby="import-title"><button className="scrim" aria-label="关闭导入窗口" onClick={() => setDialogOpen(false)} /><form className="import-modal" onSubmit={submitImport}><div className="modal-heading"><div><p className="eyebrow">NEW IMMERSION</p><h2 id="import-title">导入一段英语视频</h2></div><button type="button" className="icon-button" aria-label="关闭" onClick={() => setDialogOpen(false)}><X /></button></div><label htmlFor="video-url">HTTPS 视频链接</label><input id="video-url" name="source_url" type="url" placeholder="https://www.youtube.com/watch?..." /><p className="form-note">或选择本地视频文件（MP4、WebM、MOV、M4V）。二选一即可。</p><label htmlFor="video-file">视频文件</label><input id="video-file" name="video_file" type="file" accept="video/mp4,video/webm,video/quicktime,video/x-m4v" /><label htmlFor="subtitle-file">字幕文件（可选）</label><input id="subtitle-file" name="subtitle_file" type="file" accept=".srt,.vtt,text/vtt,application/x-subrip" /><p className="form-note">可同时上传 SRT/VTT；未提供字幕时将尝试外部英语转写。</p><div className="modal-actions"><button type="button" className="text-button" onClick={() => setDialogOpen(false)}>取消</button><button className="primary-button" disabled={submitting} type="submit">{submitting ? "提交中…" : "加入队列"} <ChevronRight size={17} /></button></div></form></div>}
       {loginOpen && <div className="modal-layer" role="dialog" aria-modal="true" aria-labelledby="login-title"><button className="scrim" aria-label="关闭登录窗口" onClick={() => setLoginOpen(false)} /><form className="import-modal" onSubmit={submitLogin}><div className="modal-heading"><div><p className="eyebrow">OWNER ACCESS</p><h2 id="login-title">{signedIn ? "个人学习空间" : "登录个人学习空间"}</h2></div><button type="button" className="icon-button" aria-label="关闭" onClick={() => setLoginOpen(false)}><X /></button></div>{signedIn ? <div className="modal-actions"><button className="text-button" type="button" onClick={signOut}>退出登录</button></div> : <><label htmlFor="owner-email">邮箱</label><input id="owner-email" name="email" type="email" required /><label htmlFor="owner-password">密码</label><input id="owner-password" name="password" type="password" minLength={12} required /><div className="modal-actions"><button className="primary-button" type="submit">登录</button></div></>}</form></div>}
       {rolePlayOpen && rolePlay && <div className="modal-layer" role="dialog" aria-modal="true" aria-labelledby="role-play-title"><button className="scrim" aria-label="关闭角色扮演" onClick={() => setRolePlayOpen(false)} /><form className="import-modal" onSubmit={sendRolePlay}><div className="modal-heading"><div><p className="eyebrow">ROLE PLAY</p><h2 id="role-play-title">{rolePlay.scenario}</h2></div><button type="button" className="icon-button" aria-label="关闭" onClick={() => setRolePlayOpen(false)}><X /></button></div><p className="form-note">用英语点一杯咖啡。{rolePlay.status === "waiting_for_reply" ? "AI 正在准备回复…" : rolePlay.status === "failed" ? "AI 回复失败，请稍后重试。" : ""}</p>{rolePlay.messages.map((message, index) => <p className="role-message" key={index}><strong>{message.speaker === "learner" ? "你" : "AI"}：</strong>{message.content}</p>)}<label htmlFor="role-message">你的英文回应</label><input id="role-message" value={roleMessage} onChange={(event) => setRoleMessage(event.target.value)} placeholder="Could I have a latte, please?" /><div className="modal-actions"><button className="primary-button" disabled={rolePlay.status === "waiting_for_reply"} type="submit">发送</button></div></form></div>}
+      {writingOpen && <div className="modal-layer" role="dialog" aria-modal="true" aria-labelledby="writing-title"><button className="scrim" aria-label="关闭写作反馈" onClick={() => setWritingOpen(false)} /><form className="import-modal" onSubmit={sendWriting}><div className="modal-heading"><div><p className="eyebrow">WRITING CHECK</p><h2 id="writing-title">用英语表达观点</h2></div><button type="button" className="icon-button" aria-label="关闭" onClick={() => setWritingOpen(false)}><X /></button></div><p className="writing-prompt">{writingPrompt}</p><label htmlFor="writing-draft">你的回答</label><textarea id="writing-draft" value={writingDraft} onChange={(event) => setWritingDraft(event.target.value)} placeholder="I think my city could..." minLength={20} required />{writing?.status === "queued" || writing?.status === "processing" ? <p className="form-note">正在生成逐条反馈…</p> : null}{writing?.status === "failed" && <p className="import-error">{writing.error_message ?? "反馈生成失败，请稍后重试。"}</p>}{writing?.feedback && <div className="writing-feedback"><strong>{writing.feedback.summary ?? "反馈已生成"}</strong>{writing.feedback.corrections?.map((correction) => <p key={correction}>{correction}</p>)}{writing.feedback.improved_version && <p><em>更自然的表达：</em>{writing.feedback.improved_version}</p>}</div>}<div className="modal-actions"><button className="primary-button" disabled={["queued", "processing"].includes(writing?.status ?? "")} type="submit">获取反馈</button></div></form></div>}
       {toast && <div className="toast" role="status"><Check size={18} /> {toast}</div>}
     </main>
   );

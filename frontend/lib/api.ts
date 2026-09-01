@@ -102,6 +102,14 @@ export async function getImportEvents(jobId: string): Promise<ImportEvent[]> {
 
 export type DictationResult = { score: number; missed_words: string[]; normalized_answer: string };
 export type RolePlaySession = { id: string; scenario: string; status: string; messages: Array<{ speaker: string; content: string; coaching_tip: string | null }> };
+export type WritingAttempt = {
+  id: string;
+  prompt: string;
+  content: string;
+  status: string;
+  feedback: { summary?: string; corrections?: string[]; improved_version?: string } | null;
+  error_message: string | null;
+};
 
 export async function submitDictation(answer: string, reference: string): Promise<DictationResult> {
   const response = await ownerFetch("/owner/dictation/attempts", {
@@ -132,5 +140,21 @@ export async function submitRolePlayTurn(sessionId: string, learnerMessage: stri
 export async function getRolePlaySession(sessionId: string): Promise<RolePlaySession> {
   const response = await ownerFetch(`/owner/role-play/sessions/${sessionId}`);
   if (!response.ok) throw new Error((await response.json()).detail ?? "读取角色扮演会话失败");
+  return response.json();
+}
+
+export async function submitWriting(prompt: string, content: string): Promise<WritingAttempt> {
+  const response = await ownerFetch("/owner/writing/attempts", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ prompt, content }),
+  });
+  if (!response.ok) throw new Error((await response.json()).detail ?? "写作提交失败");
+  return response.json();
+}
+
+export async function getWritingAttempt(attemptId: string): Promise<WritingAttempt> {
+  const response = await ownerFetch(`/owner/writing/attempts/${attemptId}`);
+  if (!response.ok) throw new Error((await response.json()).detail ?? "读取写作反馈失败");
   return response.json();
 }
