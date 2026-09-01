@@ -21,13 +21,29 @@ export async function login(email: string, password: string): Promise<void> {
   window.localStorage.setItem(tokenKey, body.access_token);
 }
 
-export async function createUrlImport(sourceUrl: string): Promise<void> {
+export type ImportJob = { id: string; status: string; progress: number; message: string };
+
+async function ownerFetch(path: string, init: RequestInit = {}): Promise<Response> {
   const token = getAccessToken();
   if (!token) throw new Error("请先登录 Owner 账户");
-  const response = await fetch(`${apiBaseUrl}/owner/immersion/imports`, {
+  return fetch(`${apiBaseUrl}${path}`, {
+    ...init,
+    headers: { ...init.headers, Authorization: `Bearer ${token}` },
+  });
+}
+
+export async function createUrlImport(sourceUrl: string): Promise<ImportJob> {
+  const response = await ownerFetch("/owner/immersion/imports", {
     method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ source_url: sourceUrl, accent: "en-US" }),
   });
   if (!response.ok) throw new Error((await response.json()).detail ?? "导入失败");
+  return response.json();
+}
+
+export async function getImport(jobId: string): Promise<ImportJob> {
+  const response = await ownerFetch(`/owner/immersion/imports/${jobId}`);
+  if (!response.ok) throw new Error((await response.json()).detail ?? "读取导入进度失败");
+  return response.json();
 }

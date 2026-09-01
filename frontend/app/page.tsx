@@ -21,7 +21,7 @@ import {
   X,
 } from "lucide-react";
 import { FormEvent, useEffect, useState } from "react";
-import { createUrlImport, getAccessToken, login } from "../lib/api";
+import { createUrlImport, getAccessToken, getImport, login, type ImportJob } from "../lib/api";
 
 type Section = "今日" | "沉浸" | "复习" | "词库" | "我";
 
@@ -48,10 +48,21 @@ export default function Home() {
     () => typeof window !== "undefined" && Boolean(getAccessToken()),
   );
   const [submitting, setSubmitting] = useState(false);
+  const [importJob, setImportJob] = useState<ImportJob | null>(null);
 
   useEffect(() => {
     document.documentElement.dataset.theme = dark ? "dark" : "light";
   }, [dark]);
+
+  useEffect(() => {
+    if (!importJob || ["ready", "failed", "cancelled"].includes(importJob.status)) return;
+    const timer = window.setInterval(() => {
+      getImport(importJob.id).then(setImportJob).catch((error: unknown) => {
+        notify(error instanceof Error ? error.message : "无法读取导入进度");
+      });
+    }, 2000);
+    return () => window.clearInterval(timer);
+  }, [importJob]);
 
   function notify(message: string) {
     setToast(message);
@@ -63,9 +74,10 @@ export default function Home() {
     const sourceUrl = new FormData(event.currentTarget).get("source_url")?.toString() ?? "";
     setSubmitting(true);
     try {
-      await createUrlImport(sourceUrl);
+      const job = await createUrlImport(sourceUrl);
+      setImportJob(job);
       setDialogOpen(false);
-      notify("视频已加入处理队列，完成后会出现在沉浸学习中。");
+      notify("视频已加入处理队列，正在准备学习材料。");
     } catch (error) {
       notify(error instanceof Error ? error.message : "导入失败，请稍后重试。");
     } finally {
@@ -120,6 +132,7 @@ export default function Home() {
         </section>
 
         <section className="section-heading"><div><p className="eyebrow">IMMERSION PATH</p><h2>正在进行</h2></div><button className="text-button" onClick={() => setActive("沉浸")}>查看全部 <ChevronRight size={16} /></button></section>
+        {importJob && <p className="import-status" role="status">导入进度：{importJob.progress}% · {importJob.message}</p>}
         <article className="lesson-card">
           <div className="video-cover"><span className="cover-label">BBC LEARNING</span><button className="play-button" aria-label="播放本课" onClick={() => notify("已从 06:42 继续播放。")}><Play fill="currentColor" /></button><span className="duration">12:48</span></div>
           <div className="lesson-detail"><div className="lesson-meta"><span className="tag">B1 · en-GB</span><span>上次学习于今天 09:18</span></div><h3>How cities can become more liveable</h3><p>从城市生活议题中练习观点表达与自然连读。</p><div className="progress-line"><span style={{ width: "62%" }} /></div><div className="lesson-bottom"><strong>已完成 62%</strong><button className="outline-button" onClick={() => setActive("沉浸")}>继续 <ChevronRight size={16} /></button></div></div>
