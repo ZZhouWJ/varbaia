@@ -268,6 +268,15 @@ async def test_owner_can_upload_and_range_stream_media() -> None:
             assert streamed.status_code == 206
             assert streamed.headers["content-range"] == "bytes 2-7/14"
             assert streamed.content == b"ke-mp4"
+            deleted = await client.delete(
+                f"/api/owner/immersion/media/{asset_id}", headers=headers
+            )
+            assert deleted.status_code == 204
+            unavailable = await client.get(
+                f"/api/owner/immersion/media/{asset_id}", headers=headers
+            )
+            assert unavailable.status_code == 404
+            stored_name = None
     finally:
         async with SessionLocal() as session:
             assets = (

@@ -1,7 +1,7 @@
 from pathlib import Path
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Request, Response, UploadFile, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -225,3 +225,21 @@ async def stream_media(
         media_type=asset.mime_type,
         headers=headers,
     )
+
+
+@router.delete("/media/{asset_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_media(
+    asset_id: UUID,
+    owner: User = Depends(get_owner),
+    session: AsyncSession = Depends(get_session),
+) -> Response:
+    asset = await session.scalar(
+        select(MediaAsset).where(MediaAsset.id == asset_id, MediaAsset.owner_user_id == owner.id)
+    )
+    if asset is None:
+        raise HTTPException(status_code=404, detail="未找到媒体")
+    path = safe_media_path(Path(get_settings().media_root).resolve(), asset.stored_name)
+    path.unlink(missing_ok=True)
+    await session.delete(asset)
+    await session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
