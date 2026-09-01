@@ -34,7 +34,7 @@ router = APIRouter(prefix="/owner/immersion", tags=["owner-immersion"])
 VIDEO_SUFFIXES = {".mp4", ".webm", ".mov", ".m4v"}
 
 
-def to_schema(record: ImportJobRecord) -> ImportJob:
+def to_schema(record: ImportJobRecord, media_asset_id: UUID | None = None) -> ImportJob:
     if record.status == "ready":
         message = "学习材料已就绪"
     elif record.status == "failed":
@@ -47,6 +47,7 @@ def to_schema(record: ImportJobRecord) -> ImportJob:
         status=record.status,
         progress=record.progress,
         message=message,
+        media_asset_id=media_asset_id,
         created_at=record.created_at,
     )
 
@@ -80,7 +81,15 @@ async def list_persistent_imports(
             .order_by(ImportJobRecord.updated_at.desc())
         )
     ).all()
-    return [to_schema(job) for job in jobs]
+    assets = (
+        await session.execute(
+            select(MediaAsset.import_job_id, MediaAsset.id).where(
+                MediaAsset.import_job_id.in_([job.id for job in jobs])
+            )
+        )
+    ).all() if jobs else []
+    asset_ids = {job_id: asset_id for job_id, asset_id in assets}
+    return [to_schema(job, asset_ids.get(job.id)) for job in jobs]
 
 
 @router.get("/imports/{job_id}", response_model=ImportJob)
@@ -96,7 +105,10 @@ async def get_persistent_import(
     )
     if job is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="未找到导入任务")
-    return to_schema(job)
+    asset_id = await session.scalar(
+        select(MediaAsset.id).where(MediaAsset.import_job_id == job.id)
+    )
+    return to_schema(job, asset_id)
 
 
 class ImportEventResponse(BaseModel):
@@ -239,15 +251,14 @@ async def upload_media(
         job = ImportJobRecord(owner_user_id=owner.id, source_url=f"upload://{stored_name}")
         session.add(job)
         await session.flush()
-        session.add(
-            MediaAsset(
+        asset = MediaAsset(
                 owner_user_id=owner.id,
                 import_job_id=job.id,
                 stored_name=stored_name,
                 mime_type=video.content_type,
                 size_bytes=total,
             )
-        )
+        session.add(asset)
         session.add_all(
             TranscriptSegmentRecord(
                 import_job_id=job.id,
@@ -268,7 +279,7 @@ async def upload_media(
         if subtitle is not None:
             await subtitle.close()
     import_media.delay(str(job.id), request.headers.get("x-request-id"))
-    return to_schema(job)
+    return to_schema(job, asset.id)
 
 
 @router.get("/media/{asset_id}")

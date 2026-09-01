@@ -33,6 +33,7 @@ class ImportJob(BaseModel):
     status: ImportStatus = ImportStatus.queued
     progress: int = Field(default=0, ge=0, le=100)
     message: str = "已进入处理队列"
+    media_asset_id: UUID | None = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 

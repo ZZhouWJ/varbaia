@@ -257,6 +257,7 @@ async def test_owner_can_upload_and_range_stream_media() -> None:
                 files={"video": ("fixture.mp4", b"\x00\x00\x00\x18ftypisomfake", "video/mp4")},
             )
             assert uploaded.status_code == 202
+            assert uploaded.json()["media_asset_id"]
             async with SessionLocal() as session:
                 asset = await session.scalar(
                     select(MediaAsset).where(MediaAsset.import_job_id == uploaded.json()["id"])

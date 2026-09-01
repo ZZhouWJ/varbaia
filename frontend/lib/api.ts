@@ -47,7 +47,7 @@ async function refreshAccessToken(): Promise<string | null> {
   return body.access_token;
 }
 
-export type ImportJob = { id: string; status: string; progress: number; message: string };
+export type ImportJob = { id: string; status: string; progress: number; message: string; media_asset_id: string | null };
 export type ImportEvent = { status: string; progress: number; message: string; created_at: string };
 
 async function ownerFetch(path: string, init: RequestInit = {}): Promise<Response> {
@@ -98,6 +98,12 @@ export async function getImportEvents(jobId: string): Promise<ImportEvent[]> {
   const response = await ownerFetch(`/owner/immersion/imports/${jobId}/events`);
   if (!response.ok) throw new Error((await response.json()).detail ?? "读取任务事件失败");
   return response.json();
+}
+
+export async function getMediaObjectUrl(assetId: string): Promise<string> {
+  const response = await ownerFetch(`/owner/immersion/media/${assetId}`);
+  if (!response.ok) throw new Error((await response.json()).detail ?? "读取视频失败");
+  return URL.createObjectURL(await response.blob());
 }
 
 export type DictationResult = { score: number; missed_words: string[]; normalized_answer: string };

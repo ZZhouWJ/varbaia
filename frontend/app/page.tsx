@@ -26,6 +26,7 @@ import {
   getAccessToken,
   getImport,
   getImportEvents,
+  getMediaObjectUrl,
   getRolePlaySession,
   getWritingAttempt,
   createRolePlaySession,
@@ -71,6 +72,7 @@ export default function Home() {
   const [submitting, setSubmitting] = useState(false);
   const [importJob, setImportJob] = useState<ImportJob | null>(null);
   const [importEvents, setImportEvents] = useState<ImportEvent[]>([]);
+  const [media, setMedia] = useState<{ assetId: string; url: string } | null>(null);
   const [rolePlayOpen, setRolePlayOpen] = useState(false);
   const [rolePlay, setRolePlay] = useState<RolePlaySession | null>(null);
   const [roleMessage, setRoleMessage] = useState("");
@@ -104,6 +106,17 @@ export default function Home() {
     if (!importJob) return;
     getImportEvents(importJob.id).then(setImportEvents).catch(() => undefined);
   }, [importJob]);
+
+  useEffect(() => {
+    if (!importJob?.media_asset_id) return;
+    let active = true;
+    let objectUrl: string | null = null;
+    getMediaObjectUrl(importJob.media_asset_id).then((url) => {
+      objectUrl = url;
+      if (active) setMedia({ assetId: importJob.media_asset_id!, url }); else URL.revokeObjectURL(url);
+    }).catch((error: unknown) => notify(error instanceof Error ? error.message : "无法加载视频"));
+    return () => { active = false; if (objectUrl) URL.revokeObjectURL(objectUrl); };
+  }, [importJob?.media_asset_id]);
 
   useEffect(() => {
     if (!rolePlay || rolePlay.status !== "waiting_for_reply") return;
@@ -229,7 +242,7 @@ export default function Home() {
         {importJob && <p className="import-status" role="status">导入进度：{importJob.progress}% · {importJob.message}</p>}
         {importJob?.status === "failed" && importEvents.length > 0 && <p className="import-error">{importEvents.at(-1)?.message}</p>}
         <article className="lesson-card">
-          <div className="video-cover"><span className="cover-label">BBC LEARNING</span><button className="play-button" aria-label="播放本课" onClick={() => notify("已从 06:42 继续播放。")}><Play fill="currentColor" /></button><span className="duration">12:48</span></div>
+          <div className="video-cover">{importJob?.media_asset_id && media?.assetId === importJob.media_asset_id ? <video className="lesson-video" controls preload="metadata" src={media.url} /> : <><span className="cover-label">BBC LEARNING</span><button className="play-button" aria-label="播放本课" onClick={() => notify("请先导入本地视频后播放。")}><Play fill="currentColor" /></button><span className="duration">12:48</span></>}</div>
           <div className="lesson-detail"><div className="lesson-meta"><span className="tag">B1 · en-GB</span><span>上次学习于今天 09:18</span></div><h3>How cities can become more liveable</h3><p>从城市生活议题中练习观点表达与自然连读。</p><div className="progress-line"><span style={{ width: "62%" }} /></div><div className="lesson-bottom"><strong>已完成 62%</strong><button className="outline-button" onClick={() => setActive("沉浸")}>继续 <ChevronRight size={16} /></button></div></div>
         </article>
 
