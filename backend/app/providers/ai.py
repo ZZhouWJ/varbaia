@@ -13,10 +13,20 @@ class WritingEvaluation:
     suggestions: list[str]
 
 
+@dataclass(frozen=True)
+class RolePlayReply:
+    reply: str
+    coaching_tip: str
+
+
 class EnglishLearningProvider(Protocol):
     async def evaluate_writing(self, prompt: str, draft: str) -> WritingEvaluation: ...
 
     async def transcribe_english(self, audio_url: str) -> list[dict[str, object]]: ...
+
+    async def reply_to_role_play(
+        self, scenario: str, conversation: list[dict[str, str]]
+    ) -> RolePlayReply: ...
 
 
 class ExternalHttpProvider:
@@ -72,3 +82,34 @@ class ExternalHttpProvider:
             {"start": float(item["start"]), "end": float(item["end"]), "text": str(item["text"])}
             for item in segments
         ]
+
+    async def reply_to_role_play(
+        self, scenario: str, conversation: list[dict[str, str]]
+    ) -> RolePlayReply:
+        if not self.base_url or not self.api_key:
+            raise RuntimeError("未配置外部 AI Provider，无法执行角色扮演。")
+        payload = {
+            "model": "configured-by-provider",
+            "messages": [
+                {
+                    "role": "system",
+                    "content": (
+                        "You are an English conversation partner. Reply naturally in English, "
+                        "then return JSON with reply and one concise coaching_tip."
+                    ),
+                },
+                {"role": "user", "content": f"Scenario: {scenario}\nConversation: {conversation}"},
+            ],
+            "response_format": {"type": "json_object"},
+        }
+        async with httpx.AsyncClient(timeout=45) as client:
+            response = await client.post(
+                f"{self.base_url}/chat/completions",
+                headers={"Authorization": f"Bearer {self.api_key}"},
+                json=payload,
+            )
+            response.raise_for_status()
+        import json
+
+        data = json.loads(response.json()["choices"][0]["message"]["content"])
+        return RolePlayReply(reply=str(data["reply"]), coaching_tip=str(data["coaching_tip"]))

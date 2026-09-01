@@ -5,7 +5,7 @@ from uuid import uuid4
 import pytest
 from argon2 import PasswordHasher
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import delete
+from sqlalchemy import delete, select
 
 if os.getenv("RUN_DB_TESTS") != "1":
     pytest.skip("需要 RUN_DB_TESTS=1 的本地 PostgreSQL", allow_module_level=True)
@@ -13,7 +13,15 @@ if os.getenv("RUN_DB_TESTS") != "1":
 from app.core.database import SessionLocal, engine
 from app.core.security import create_access_token
 from app.main import app
-from app.models import ImportJobRecord, ProgressRecord, User, VocabularyItem, WritingAttempt
+from app.models import (
+    ImportJobRecord,
+    ProgressRecord,
+    RolePlayMessage,
+    RolePlaySession,
+    User,
+    VocabularyItem,
+    WritingAttempt,
+)
 from app.modules.writing_tasks import evaluate_writing
 
 
@@ -170,6 +178,49 @@ async def test_owner_can_save_and_resume_learning_progress() -> None:
         async with SessionLocal() as session:
             await session.execute(
                 delete(ProgressRecord).where(ProgressRecord.owner_user_id == user.id)
+            )
+            await session.execute(delete(User).where(User.id == user.id))
+            await session.commit()
+
+
+@pytest.mark.asyncio
+async def test_owner_can_create_role_play_session_and_turn() -> None:
+    user = User(
+        email=f"role-play-{uuid4()}@example.com",
+        password_hash=PasswordHasher().hash("long-test-password"),
+    )
+    async with SessionLocal() as session:
+        session.add(user)
+        await session.commit()
+        await session.refresh(user)
+    headers = {"Authorization": f"Bearer {create_access_token(user.id)}"}
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            created = await client.post(
+                "/api/owner/role-play/sessions",
+                headers=headers,
+                json={"scenario": "Ordering coffee at a busy cafe"},
+            )
+            assert created.status_code == 201
+            session_id = created.json()["id"]
+            turn = await client.post(
+                f"/api/owner/role-play/sessions/{session_id}/turns",
+                headers=headers,
+                json={"learner_message": "Could I have a latte, please?"},
+            )
+            assert turn.status_code == 202
+            assert turn.json()["status"] == "waiting_for_reply"
+            assert turn.json()["messages"][0]["speaker"] == "learner"
+    finally:
+        async with SessionLocal() as session:
+            session_ids = select(RolePlaySession.id).where(
+                RolePlaySession.owner_user_id == user.id
+            )
+            await session.execute(
+                delete(RolePlayMessage).where(RolePlayMessage.session_id.in_(session_ids))
+            )
+            await session.execute(
+                delete(RolePlaySession).where(RolePlaySession.owner_user_id == user.id)
             )
             await session.execute(delete(User).where(User.id == user.id))
             await session.commit()

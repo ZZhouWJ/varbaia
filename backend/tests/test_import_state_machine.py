@@ -15,3 +15,4 @@ def test_celery_worker_imports_immersion_tasks() -> None:
     celery_app.loader.import_default_modules()
     assert "immersion.import_media" in celery_app.tasks
     assert "writing.evaluate" in celery_app.tasks
+    assert "role_play.reply" in celery_app.tasks

@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_session
 from app.models import RolePlayMessage, RolePlaySession, User
 from app.modules.auth import get_owner
+from app.modules.role_play_tasks import reply_to_role_play
 
 router = APIRouter(prefix="/owner/role-play", tags=["owner-role-play"])
 
@@ -87,7 +88,9 @@ async def add_learner_turn(
 ) -> SessionResponse:
     item = await get_owned_session(session_id, owner.id, db)
     db.add(RolePlayMessage(session_id=item.id, speaker="learner", content=payload.learner_message))
+    item.status = "waiting_for_reply"
     await db.commit()
+    reply_to_role_play.delay(str(item.id))
     return await to_response(item, db)
 
 
