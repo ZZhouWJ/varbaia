@@ -251,7 +251,7 @@ async def test_owner_can_upload_and_range_stream_media() -> None:
             uploaded = await client.post(
                 "/api/owner/immersion/uploads",
                 headers=headers,
-                files={"video": ("fixture.mp4", b"fake-mp4-bytes", "video/mp4")},
+                files={"video": ("fixture.mp4", b"\x00\x00\x00\x18ftypisomfake", "video/mp4")},
             )
             assert uploaded.status_code == 202
             async with SessionLocal() as session:
@@ -263,11 +263,11 @@ async def test_owner_can_upload_and_range_stream_media() -> None:
                 asset_id = asset.id
             streamed = await client.get(
                 f"/api/owner/immersion/media/{asset_id}",
-                headers={**headers, "Range": "bytes=2-7"},
+                headers={**headers, "Range": "bytes=4-9"},
             )
             assert streamed.status_code == 206
-            assert streamed.headers["content-range"] == "bytes 2-7/14"
-            assert streamed.content == b"ke-mp4"
+            assert streamed.headers["content-range"] == "bytes 4-9/16"
+            assert streamed.content == b"ftypis"
             deleted = await client.delete(
                 f"/api/owner/immersion/media/{asset_id}", headers=headers
             )

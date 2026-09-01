@@ -11,7 +11,12 @@ from app.core.config import get_settings
 from app.core.database import get_session
 from app.models import ImportJobRecord, MediaAsset, TranscriptSegmentRecord, User
 from app.modules.auth import get_owner
-from app.modules.immersion.media import iter_bytes, parse_range, safe_media_path
+from app.modules.immersion.media import (
+    iter_bytes,
+    parse_range,
+    safe_media_path,
+    validate_media_signature,
+)
 from app.modules.immersion.quota import DiskBudget, enforce_disk_budget
 from app.modules.immersion.schemas import (
     ImportJob,
@@ -200,6 +205,7 @@ async def upload_media(
                 if total > limit:
                     raise HTTPException(status_code=413, detail="上传文件超过大小限制")
                 target.write(chunk)
+        validate_media_signature(destination, suffix)
         job = ImportJobRecord(owner_user_id=owner.id, source_url=f"upload://{stored_name}")
         session.add(job)
         await session.flush()

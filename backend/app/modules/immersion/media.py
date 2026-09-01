@@ -11,6 +11,21 @@ def safe_media_path(root: Path, stored_name: str) -> Path:
     return path
 
 
+def validate_media_signature(path: Path, suffix: str) -> None:
+    """Reject files whose container header conflicts with the claimed video extension."""
+    header = path.read_bytes()[:32]
+    is_iso_bmff = len(header) >= 8 and header[4:8] == b"ftyp"
+    is_webm = header.startswith(b"\x1a\x45\xdf\xa3")
+    valid = (suffix in {".mp4", ".mov", ".m4v"} and is_iso_bmff) or (
+        suffix == ".webm" and is_webm
+    )
+    if not valid:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="媒体内容与文件类型不匹配",
+        )
+
+
 def parse_range(value: str | None, size: int) -> tuple[int, int] | None:
     if not value:
         return None
