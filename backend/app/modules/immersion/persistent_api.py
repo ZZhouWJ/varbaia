@@ -52,6 +52,21 @@ async def create_persistent_import(
     return to_schema(job)
 
 
+@router.get("/imports", response_model=list[ImportJob])
+async def list_persistent_imports(
+    owner: User = Depends(get_owner),
+    session: AsyncSession = Depends(get_session),
+) -> list[ImportJob]:
+    jobs = (
+        await session.scalars(
+            select(ImportJobRecord)
+            .where(ImportJobRecord.owner_user_id == owner.id)
+            .order_by(ImportJobRecord.updated_at.desc())
+        )
+    ).all()
+    return [to_schema(job) for job in jobs]
+
+
 @router.get("/imports/{job_id}", response_model=ImportJob)
 async def get_persistent_import(
     job_id: UUID,

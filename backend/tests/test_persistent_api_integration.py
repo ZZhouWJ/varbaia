@@ -59,6 +59,9 @@ async def test_owner_can_create_and_read_persistent_import() -> None:
             found = await client.get(f"/api/owner/immersion/imports/{job_id}", headers=headers)
             assert found.status_code == 200
             assert found.json()["id"] == job_id
+            listed = await client.get("/api/owner/immersion/imports", headers=headers)
+            assert listed.status_code == 200
+            assert any(item["id"] == job_id for item in listed.json())
     finally:
         async with SessionLocal() as session:
             await session.execute(
