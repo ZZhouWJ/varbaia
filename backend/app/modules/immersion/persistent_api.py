@@ -3,15 +3,20 @@ from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
 from fastapi.responses import StreamingResponse
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.core.database import get_session
-from app.models import ImportJobRecord, MediaAsset, User
+from app.models import ImportJobRecord, MediaAsset, TranscriptSegmentRecord, User
 from app.modules.auth import get_owner
 from app.modules.immersion.media import iter_bytes, parse_range, safe_media_path
-from app.modules.immersion.schemas import ImportJob, VideoImportRequest
+from app.modules.immersion.schemas import (
+    ImportJob,
+    TranscriptReplace,
+    TranscriptSegment,
+    VideoImportRequest,
+)
 from app.modules.immersion.service import ImmersionService
 from app.modules.immersion.tasks import import_media
 
@@ -61,6 +66,75 @@ async def get_persistent_import(
     if job is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="未找到导入任务")
     return to_schema(job)
+
+
+async def get_owned_import(job_id: UUID, owner_id: UUID, session: AsyncSession) -> ImportJobRecord:
+    job = await session.scalar(
+        select(ImportJobRecord).where(
+            ImportJobRecord.id == job_id, ImportJobRecord.owner_user_id == owner_id
+        )
+    )
+    if job is None:
+        raise HTTPException(status_code=404, detail="未找到导入任务")
+    return job
+
+
+@router.put("/imports/{job_id}/transcript", response_model=list[TranscriptSegment])
+async def replace_transcript(
+    job_id: UUID,
+    payload: TranscriptReplace,
+    owner: User = Depends(get_owner),
+    session: AsyncSession = Depends(get_session),
+) -> list[TranscriptSegment]:
+    await get_owned_import(job_id, owner.id, session)
+    segments = sorted(payload.segments, key=lambda segment: segment.order)
+    if any(segment.end_ms <= segment.start_ms for segment in segments):
+        raise HTTPException(status_code=422, detail="字幕时间范围无效")
+    if [segment.order for segment in segments] != list(range(len(segments))):
+        raise HTTPException(status_code=422, detail="字幕顺序必须从 0 连续编号")
+    await session.execute(
+        delete(TranscriptSegmentRecord).where(TranscriptSegmentRecord.import_job_id == job_id)
+    )
+    session.add_all(
+        TranscriptSegmentRecord(
+            import_job_id=job_id,
+            position=segment.order,
+            start_ms=segment.start_ms,
+            end_ms=segment.end_ms,
+            text=segment.text,
+            translation=segment.translation,
+        )
+        for segment in segments
+    )
+    await session.commit()
+    return segments
+
+
+@router.get("/imports/{job_id}/transcript", response_model=list[TranscriptSegment])
+async def get_transcript(
+    job_id: UUID,
+    owner: User = Depends(get_owner),
+    session: AsyncSession = Depends(get_session),
+) -> list[TranscriptSegment]:
+    await get_owned_import(job_id, owner.id, session)
+    rows = (
+        await session.scalars(
+            select(TranscriptSegmentRecord)
+            .where(TranscriptSegmentRecord.import_job_id == job_id)
+            .order_by(TranscriptSegmentRecord.position)
+        )
+    ).all()
+    return [
+        TranscriptSegment(
+            id=row.id,
+            start_ms=row.start_ms,
+            end_ms=row.end_ms,
+            text=row.text,
+            translation=row.translation,
+            order=row.position,
+        )
+        for row in rows
+    ]
 
 
 @router.post("/uploads", response_model=ImportJob, status_code=status.HTTP_202_ACCEPTED)

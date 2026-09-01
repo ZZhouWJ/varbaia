@@ -45,6 +45,10 @@ class TranscriptSegment(BaseModel):
     order: int = Field(ge=0)
 
 
+class TranscriptReplace(BaseModel):
+    segments: list[TranscriptSegment] = Field(min_length=1, max_length=20_000)
+
+
 class DictationSubmit(BaseModel):
     segment_id: UUID
     answer: str = Field(min_length=1, max_length=1000)

@@ -79,6 +79,19 @@ class MediaAsset(Base):
     )
 
 
+class TranscriptSegmentRecord(Base):
+    __tablename__ = "transcript_segments"
+    __table_args__ = (UniqueConstraint("import_job_id", "position", name="uq_transcript_position"),)
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    import_job_id: Mapped[UUID] = mapped_column(ForeignKey("import_jobs.id"), index=True)
+    position: Mapped[int] = mapped_column(Integer)
+    start_ms: Mapped[int] = mapped_column(Integer)
+    end_ms: Mapped[int] = mapped_column(Integer)
+    text: Mapped[str] = mapped_column(Text)
+    translation: Mapped[str | None] = mapped_column(Text)
+
+
 class WritingAttempt(Base):
     __tablename__ = "writing_attempts"
 
