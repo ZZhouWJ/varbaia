@@ -12,7 +12,7 @@ if os.getenv("RUN_DB_TESTS") != "1":
 from app.core.database import SessionLocal, engine
 from app.core.security import create_access_token
 from app.main import app
-from app.models import ImportJobRecord, User, WritingAttempt
+from app.models import ImportJobRecord, User, VocabularyItem, WritingAttempt
 
 
 @pytest.fixture(autouse=True)
@@ -81,6 +81,42 @@ async def test_owner_can_save_and_read_writing_attempt() -> None:
         async with SessionLocal() as session:
             await session.execute(
                 delete(WritingAttempt).where(WritingAttempt.owner_user_id == user.id)
+            )
+            await session.execute(delete(User).where(User.id == user.id))
+            await session.commit()
+
+
+@pytest.mark.asyncio
+async def test_owner_can_create_and_review_vocabulary() -> None:
+    user = User(
+        email=f"vocabulary-{uuid4()}@example.com",
+        password_hash=PasswordHasher().hash("long-test-password"),
+    )
+    async with SessionLocal() as session:
+        session.add(user)
+        await session.commit()
+        await session.refresh(user)
+    headers = {"Authorization": f"Bearer {create_access_token(user.id)}"}
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            created = await client.post(
+                "/api/owner/vocabulary/items",
+                headers=headers,
+                json={"term": "curious", "definition": "wanting to know more"},
+            )
+            assert created.status_code == 201
+            item_id = created.json()["id"]
+            due = await client.get("/api/owner/vocabulary/due", headers=headers)
+            assert any(item["id"] == item_id for item in due.json())
+            reviewed = await client.post(
+                f"/api/owner/vocabulary/items/{item_id}/review/easy", headers=headers
+            )
+            assert reviewed.status_code == 200
+            assert reviewed.json()["repetitions"] == 1
+    finally:
+        async with SessionLocal() as session:
+            await session.execute(
+                delete(VocabularyItem).where(VocabularyItem.owner_user_id == user.id)
             )
             await session.execute(delete(User).where(User.id == user.id))
             await session.commit()
