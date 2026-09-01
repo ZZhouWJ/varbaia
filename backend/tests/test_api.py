@@ -11,6 +11,9 @@ async def test_health_and_import_lifecycle() -> None:
         assert health.status_code == 200
         assert health.json()["status"] == "ok"
 
+        live = await client.get("/api/health/live")
+        assert live.status_code == 200
+
         created = await client.post(
             "/api/immersion/imports",
             json={"source_url": "https://www.youtube.com/watch?v=lesson", "accent": "en-US"},
