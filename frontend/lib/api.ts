@@ -128,3 +128,9 @@ export async function submitRolePlayTurn(sessionId: string, learnerMessage: stri
   if (!response.ok) throw new Error((await response.json()).detail ?? "角色扮演提交失败");
   return response.json();
 }
+
+export async function getRolePlaySession(sessionId: string): Promise<RolePlaySession> {
+  const response = await ownerFetch(`/owner/role-play/sessions/${sessionId}`);
+  if (!response.ok) throw new Error((await response.json()).detail ?? "读取角色扮演会话失败");
+  return response.json();
+}

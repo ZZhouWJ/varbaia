@@ -26,6 +26,7 @@ import {
   getAccessToken,
   getImport,
   getImportEvents,
+  getRolePlaySession,
   createRolePlaySession,
   listImports,
   login,
@@ -96,6 +97,16 @@ export default function Home() {
     if (!importJob) return;
     getImportEvents(importJob.id).then(setImportEvents).catch(() => undefined);
   }, [importJob]);
+
+  useEffect(() => {
+    if (!rolePlay || rolePlay.status !== "waiting_for_reply") return;
+    const timer = window.setInterval(() => {
+      getRolePlaySession(rolePlay.id).then(setRolePlay).catch((error: unknown) => {
+        notify(error instanceof Error ? error.message : "无法读取角色扮演回复");
+      });
+    }, 1800);
+    return () => window.clearInterval(timer);
+  }, [rolePlay]);
 
   function notify(message: string) {
     setToast(message);
@@ -216,7 +227,7 @@ export default function Home() {
 
       {dialogOpen && <div className="modal-layer" role="dialog" aria-modal="true" aria-labelledby="import-title"><button className="scrim" aria-label="关闭导入窗口" onClick={() => setDialogOpen(false)} /><form className="import-modal" onSubmit={submitImport}><div className="modal-heading"><div><p className="eyebrow">NEW IMMERSION</p><h2 id="import-title">导入一段英语视频</h2></div><button type="button" className="icon-button" aria-label="关闭" onClick={() => setDialogOpen(false)}><X /></button></div><label htmlFor="video-url">HTTPS 视频链接</label><input id="video-url" name="source_url" type="url" placeholder="https://www.youtube.com/watch?..." /><p className="form-note">或选择本地视频文件（MP4、WebM、MOV、M4V）。二选一即可。</p><label htmlFor="video-file">视频文件</label><input id="video-file" name="video_file" type="file" accept="video/mp4,video/webm,video/quicktime,video/x-m4v" /><label htmlFor="subtitle-file">字幕文件（可选）</label><input id="subtitle-file" name="subtitle_file" type="file" accept=".srt,.vtt,text/vtt,application/x-subrip" /><p className="form-note">可同时上传 SRT/VTT；未提供字幕时将尝试外部英语转写。</p><div className="modal-actions"><button type="button" className="text-button" onClick={() => setDialogOpen(false)}>取消</button><button className="primary-button" disabled={submitting} type="submit">{submitting ? "提交中…" : "加入队列"} <ChevronRight size={17} /></button></div></form></div>}
       {loginOpen && <div className="modal-layer" role="dialog" aria-modal="true" aria-labelledby="login-title"><button className="scrim" aria-label="关闭登录窗口" onClick={() => setLoginOpen(false)} /><form className="import-modal" onSubmit={submitLogin}><div className="modal-heading"><div><p className="eyebrow">OWNER ACCESS</p><h2 id="login-title">{signedIn ? "个人学习空间" : "登录个人学习空间"}</h2></div><button type="button" className="icon-button" aria-label="关闭" onClick={() => setLoginOpen(false)}><X /></button></div>{signedIn ? <div className="modal-actions"><button className="text-button" type="button" onClick={signOut}>退出登录</button></div> : <><label htmlFor="owner-email">邮箱</label><input id="owner-email" name="email" type="email" required /><label htmlFor="owner-password">密码</label><input id="owner-password" name="password" type="password" minLength={12} required /><div className="modal-actions"><button className="primary-button" type="submit">登录</button></div></>}</form></div>}
-      {rolePlayOpen && rolePlay && <div className="modal-layer" role="dialog" aria-modal="true" aria-labelledby="role-play-title"><button className="scrim" aria-label="关闭角色扮演" onClick={() => setRolePlayOpen(false)} /><form className="import-modal" onSubmit={sendRolePlay}><div className="modal-heading"><div><p className="eyebrow">ROLE PLAY</p><h2 id="role-play-title">{rolePlay.scenario}</h2></div><button type="button" className="icon-button" aria-label="关闭" onClick={() => setRolePlayOpen(false)}><X /></button></div><p className="form-note">用英语点一杯咖啡。提交后 AI 将异步回复。</p>{rolePlay.messages.map((message, index) => <p className="role-message" key={index}><strong>{message.speaker === "learner" ? "你" : "AI"}：</strong>{message.content}</p>)}<label htmlFor="role-message">你的英文回应</label><input id="role-message" value={roleMessage} onChange={(event) => setRoleMessage(event.target.value)} placeholder="Could I have a latte, please?" /><div className="modal-actions"><button className="primary-button" type="submit">发送</button></div></form></div>}
+      {rolePlayOpen && rolePlay && <div className="modal-layer" role="dialog" aria-modal="true" aria-labelledby="role-play-title"><button className="scrim" aria-label="关闭角色扮演" onClick={() => setRolePlayOpen(false)} /><form className="import-modal" onSubmit={sendRolePlay}><div className="modal-heading"><div><p className="eyebrow">ROLE PLAY</p><h2 id="role-play-title">{rolePlay.scenario}</h2></div><button type="button" className="icon-button" aria-label="关闭" onClick={() => setRolePlayOpen(false)}><X /></button></div><p className="form-note">用英语点一杯咖啡。{rolePlay.status === "waiting_for_reply" ? "AI 正在准备回复…" : rolePlay.status === "failed" ? "AI 回复失败，请稍后重试。" : ""}</p>{rolePlay.messages.map((message, index) => <p className="role-message" key={index}><strong>{message.speaker === "learner" ? "你" : "AI"}：</strong>{message.content}</p>)}<label htmlFor="role-message">你的英文回应</label><input id="role-message" value={roleMessage} onChange={(event) => setRoleMessage(event.target.value)} placeholder="Could I have a latte, please?" /><div className="modal-actions"><button className="primary-button" disabled={rolePlay.status === "waiting_for_reply"} type="submit">发送</button></div></form></div>}
       {toast && <div className="toast" role="status"><Check size={18} /> {toast}</div>}
     </main>
   );
