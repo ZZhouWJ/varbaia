@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     tencentcloud_secret_key: str = ""
     tencentcloud_region: str = ""
     tencentcloud_app_id: str = ""
+    tencentcloud_soe_app_id: str = ""
     tencentcloud_asr_engine_model_type: str = ""
     tencentcloud_tts_voice_type: str = ""
     media_root: str = "./data/media"
