@@ -125,7 +125,7 @@ export async function saveVideoProgress(jobId: string, positionSeconds: number, 
 export type DictationResult = { score: number; missed_words: string[]; normalized_answer: string };
 export type VocabularyItem = { id: string; term: string; definition: string; interval_days: number; ease: number; repetitions: number; next_review_at: string };
 export type PronunciationAttempt = { id: string; reference_text: string; evaluation_status: string; result: Record<string, unknown> | null; evaluation_error: string | null };
-export type RolePlaySession = { id: string; scenario: string; status: string; messages: Array<{ speaker: string; content: string; coaching_tip: string | null }> };
+export type RolePlaySession = { id: string; scenario: string; status: string; messages: Array<{ id: string; speaker: string; content: string; coaching_tip: string | null; audio_available: boolean }> };
 export type WritingAttempt = {
   id: string;
   prompt: string;
@@ -160,6 +160,20 @@ export async function submitRolePlayTurn(sessionId: string, learnerMessage: stri
   });
   if (!response.ok) throw new Error((await response.json()).detail ?? "角色扮演提交失败");
   return response.json();
+}
+
+export async function submitRolePlayVoiceTurn(sessionId: string, audio: Blob): Promise<RolePlaySession> {
+  const body = new FormData();
+  body.append("audio", audio, "role-play.webm");
+  const response = await ownerFetch(`/owner/role-play/sessions/${sessionId}/voice-turns`, { method: "POST", body });
+  if (!response.ok) throw new Error((await response.json()).detail ?? "语音角色扮演提交失败");
+  return response.json();
+}
+
+export async function getRolePlayAudioUrl(sessionId: string, messageId: string): Promise<string> {
+  const response = await ownerFetch(`/owner/role-play/sessions/${sessionId}/messages/${messageId}/audio`);
+  if (!response.ok) throw new Error((await response.json()).detail ?? "读取角色扮演语音失败");
+  return URL.createObjectURL(await response.blob());
 }
 
 export async function getRolePlaySession(sessionId: string): Promise<RolePlaySession> {
