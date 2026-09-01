@@ -21,6 +21,18 @@ export async function login(email: string, password: string): Promise<void> {
   window.localStorage.setItem(tokenKey, body.access_token);
 }
 
+export async function logout(): Promise<void> {
+  const token = getAccessToken();
+  if (token) {
+    await fetch(`${apiBaseUrl}/auth/logout`, {
+      method: "POST",
+      credentials: "include",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  }
+  clearAccessToken();
+}
+
 async function refreshAccessToken(): Promise<string | null> {
   const response = await fetch(`${apiBaseUrl}/auth/refresh`, {
     method: "POST",
