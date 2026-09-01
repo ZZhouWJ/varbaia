@@ -23,8 +23,6 @@ class Settings(BaseSettings):
     ai_api_base_url: str = ""
     ai_api_key: str = ""
     ai_model: str = ""
-    pronunciation_api_url: str = ""
-    pronunciation_api_key: str = ""
     tencentcloud_secret_id: str = ""
     tencentcloud_secret_key: str = ""
     tencentcloud_region: str = ""

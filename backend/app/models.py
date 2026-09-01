@@ -120,6 +120,7 @@ class PronunciationAttempt(Base):
     mime_type: Mapped[str] = mapped_column(String(100))
     evaluation_status: Mapped[str] = mapped_column(String(24), default="queued", index=True)
     result_json: Mapped[str | None] = mapped_column(Text)
+    raw_provider_result_json: Mapped[str | None] = mapped_column(Text)
     evaluation_error: Mapped[str | None] = mapped_column(String(500))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC)

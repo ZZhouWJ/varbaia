@@ -117,31 +117,3 @@ class ExternalHttpProvider:
 
         data = json.loads(response.json()["choices"][0]["message"]["content"])
         return RolePlayReply(reply=str(data["reply"]), coaching_tip=str(data["coaching_tip"]))
-
-    async def evaluate_pronunciation(
-        self, audio_path: str, reference_text: str
-    ) -> dict[str, object]:
-        if not self.settings.pronunciation_api_url or not self.settings.pronunciation_api_key:
-            raise RuntimeError("未配置英语发音 Provider，无法执行跟读评分。")
-        with open(audio_path, "rb") as audio:
-            async with httpx.AsyncClient(timeout=90) as client:
-                response = await client.post(
-                    self.settings.pronunciation_api_url,
-                    headers={"Authorization": f"Bearer {self.settings.pronunciation_api_key}"},
-                    data={"reference_text": reference_text, "language": "en-US"},
-                    files={"audio": audio},
-                )
-                response.raise_for_status()
-        data = response.json()
-        return {
-            key: data[key]
-            for key in (
-                "overall",
-                "accuracy",
-                "fluency",
-                "completeness",
-                "word_feedback",
-                "phoneme_feedback",
-            )
-            if key in data
-        }

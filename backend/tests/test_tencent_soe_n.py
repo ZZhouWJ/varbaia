@@ -4,7 +4,11 @@ import hmac
 from urllib.parse import parse_qs, quote, urlparse
 
 from app.core.config import Settings
-from app.providers.tencent_soe_n import signed_soe_n_handshake_target, soe_n_handshake_target
+from app.providers.tencent_soe_n import (
+    signed_soe_n_assessment_target,
+    signed_soe_n_handshake_target,
+    soe_n_handshake_target,
+)
 
 
 def test_soe_n_uses_account_app_id_and_english_engine() -> None:
@@ -139,3 +143,23 @@ def test_soe_n_matches_independent_official_sdk_reference() -> None:
     assert target.signing_text == reference_signing_text
     assert target.signature == reference_signature
     assert target.url == reference_url
+
+
+def test_assessment_target_uses_reference_text_without_changing_signer_rules() -> None:
+    target = signed_soe_n_assessment_target(
+        Settings(
+            _env_file=None,
+            tencentcloud_app_id="fake-app",
+            tencentcloud_secret_id="fake-secret-id",
+            tencentcloud_secret_key="fake-secret-key",
+        ),
+        "hello world",
+        timestamp=100,
+        nonce=9,
+        voice_id="fixed-voice-id",
+    )
+    assert target.signing_text.startswith("soe.cloud.tencent.com/soe/api/fake-app?")
+    assert "wss://" not in target.signing_text
+    assert "appid=" not in target.url
+    assert "ref_text=hello world" in target.signing_text
+    assert "ref_text=hello%20world" in target.url

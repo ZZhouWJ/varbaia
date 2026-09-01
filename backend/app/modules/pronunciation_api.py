@@ -12,6 +12,8 @@ from app.core.database import get_session
 from app.models import PronunciationAttempt, User
 from app.modules.auth import get_owner
 from app.modules.pronunciation_tasks import evaluate_pronunciation
+from app.providers.audio_normalization import validate_reference_text
+from app.providers.pronunciation import PronunciationProviderError
 
 router = APIRouter(prefix="/owner/pronunciation", tags=["owner-pronunciation"])
 SUFFIXES = {".webm", ".wav", ".ogg", ".mp4"}
@@ -42,6 +44,10 @@ async def create_attempt(
     owner: User = Depends(get_owner),
     session: AsyncSession = Depends(get_session),
 ) -> AttemptResponse:
+    try:
+        normalized_reference_text = validate_reference_text(reference_text)
+    except PronunciationProviderError as exc:
+        raise HTTPException(422, str(exc)) from exc
     suffix = Path(audio.filename or "").suffix.lower()
     if suffix not in SUFFIXES or not (audio.content_type or "").startswith("audio/"):
         raise HTTPException(422, "仅支持 WebM、WAV、OGG 或 MP4 音频")
@@ -55,7 +61,7 @@ async def create_attempt(
     (root / name).write_bytes(raw)
     attempt = PronunciationAttempt(
         owner_user_id=owner.id,
-        reference_text=reference_text,
+        reference_text=normalized_reference_text,
         stored_name=name,
         mime_type=audio.content_type,
     )

@@ -9,7 +9,10 @@ COPY app ./app
 COPY alembic.ini ./
 COPY migrations ./migrations
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint
-RUN pip install .
+RUN apt-get update \
+    && apt-get install --no-install-recommends -y ffmpeg \
+    && rm -rf /var/lib/apt/lists/* \
+    && pip install .
 RUN useradd --create-home --uid 10001 appuser && chmod +x /usr/local/bin/docker-entrypoint
 EXPOSE 8000
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint"]
