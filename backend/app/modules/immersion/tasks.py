@@ -1,14 +1,16 @@
 """Celery entrypoints for restart-safe immersion import work."""
 
 import asyncio
-from uuid import UUID
+from pathlib import Path
+from uuid import UUID, uuid4
 
 from sqlalchemy import select
 
 from app.core.config import get_settings
 from app.core.database import SessionLocal, engine
 from app.core.tasks import celery_app
-from app.models import ImportJobRecord, JobEvent, TranscriptSegmentRecord
+from app.models import ImportJobRecord, JobEvent, MediaAsset, TranscriptSegmentRecord
+from app.modules.immersion.downloader import download_remote_video
 from app.providers.ai import ExternalHttpProvider
 
 STEPS = [
@@ -41,6 +43,42 @@ async def _advance(job_id: UUID, request_id: str | None) -> str:
                 )
             )
             await session.commit()
+            if next_status == "fetching_metadata" and not job.source_url.startswith("upload://"):
+                existing_media = await session.scalar(
+                    select(MediaAsset.id).where(MediaAsset.import_job_id == job.id)
+                )
+                if existing_media is None:
+                    settings = get_settings()
+                    try:
+                        stored_name, size_bytes = await download_remote_video(
+                            source_url=job.source_url,
+                            media_root=Path(settings.media_root).resolve(),
+                            stored_stem=str(uuid4()),
+                            max_bytes=settings.max_upload_mb * 1024 * 1024,
+                        )
+                    except Exception as exc:
+                        job.status, job.progress = "failed", progress
+                        session.add(
+                            JobEvent(
+                                job_id=job.id,
+                                status="failed",
+                                progress=progress,
+                                message=f"视频下载失败：{str(exc)[:180]}",
+                                request_id=request_id,
+                            )
+                        )
+                        await session.commit()
+                        return "failed"
+                    session.add(
+                        MediaAsset(
+                            owner_user_id=job.owner_user_id,
+                            import_job_id=job.id,
+                            stored_name=stored_name,
+                            mime_type="video/mp4" if stored_name.endswith(".mp4") else "video/webm",
+                            size_bytes=size_bytes,
+                        )
+                    )
+                    await session.commit()
             if next_status == "transcribing":
                 existing_transcript = await session.scalar(
                     select(TranscriptSegmentRecord.id).where(

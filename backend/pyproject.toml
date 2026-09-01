@@ -22,6 +22,7 @@ dependencies = [
   "email-validator>=2.2,<3.0",
   "tencentcloud-sdk-python>=3.0,<4.0",
   "websockets>=13,<17",
+  "yt-dlp>=2025.1.15,<2027",
 ]
 
 [project.optional-dependencies]
