@@ -11,7 +11,7 @@ import hashlib
 import hmac
 import time
 from dataclasses import dataclass
-from urllib.parse import quote, urlencode
+from urllib.parse import quote
 from uuid import uuid4
 
 import websockets
@@ -74,7 +74,9 @@ def signed_soe_n_handshake_target(
     }
     signature_params = tuple(sorted(params.items()))
     raw_query = "&".join(f"{key}={value}" for key, value in signature_params)
-    query = urlencode(signature_params)
+    query = "&".join(
+        f"{quote(key, safe='')}={quote(value, safe='')}" for key, value in signature_params
+    )
     path = target.url.removeprefix(f"wss://{SOE_N_HOST}")
     signing_text = f"{SOE_N_HOST}{path}?{raw_query}"
     signature = base64.b64encode(

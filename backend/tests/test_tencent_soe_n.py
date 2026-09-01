@@ -1,7 +1,7 @@
 import base64
 import hashlib
 import hmac
-from urllib.parse import parse_qs, quote, urlencode, urlparse
+from urllib.parse import parse_qs, quote, urlparse
 
 from app.core.config import Settings
 from app.providers.tencent_soe_n import signed_soe_n_handshake_target, soe_n_handshake_target
@@ -56,6 +56,8 @@ def test_soe_n_signing_keeps_english_engine_and_hides_secret_key() -> None:
     assert not target.signing_text.startswith("GET")
     assert "ref_text=hello world" in target.signing_text
     assert "ref_text=hello%20world" not in target.signing_text
+    assert "ref_text=hello%20world" in target.url
+    assert "ref_text=hello+world" not in target.url
     assert "appid=" not in target.url
     assert "/soe/api/123456?" in target.url
 
@@ -108,9 +110,13 @@ def test_soe_n_matches_independent_official_sdk_reference() -> None:
     reference_signature = base64.b64encode(
         hmac.new(b"fake-secret-key", reference_signing_text.encode(), hashlib.sha1).digest()
     ).decode()
+    encoded_query = "&".join(
+        f"{quote(key, safe='')}={quote(value, safe='')}" for key, value in ordered
+    )
     reference_url = (
         "wss://soe.cloud.tencent.com/soe/api/fake-app?"
-        f"{urlencode(ordered)}&signature={quote(reference_signature, safe='')}"
+        f"{encoded_query}"
+        f"&signature={quote(reference_signature, safe='')}"
     )
     assert target.signing_text == reference_signing_text
     assert target.signature == reference_signature
