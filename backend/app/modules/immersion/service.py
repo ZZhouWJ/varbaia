@@ -29,7 +29,7 @@ class ImmersionService:
 
     def create_import(self, payload: VideoImportRequest) -> ImportJob:
         self.validate_source_url(payload)
-        job = ImportJob(source_url=payload.source_url)
+        job = ImportJob(source_url=str(payload.source_url))
         self.jobs[job.id] = job
         return job
 

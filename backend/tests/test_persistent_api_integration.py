@@ -1,5 +1,6 @@
 import asyncio
 import os
+from pathlib import Path
 from uuid import uuid4
 
 import pytest
@@ -10,11 +11,13 @@ from sqlalchemy import delete, select
 if os.getenv("RUN_DB_TESTS") != "1":
     pytest.skip("需要 RUN_DB_TESTS=1 的本地 PostgreSQL", allow_module_level=True)
 
+from app.core.config import get_settings
 from app.core.database import SessionLocal, engine
 from app.core.security import create_access_token
 from app.main import app
 from app.models import (
     ImportJobRecord,
+    MediaAsset,
     ProgressRecord,
     RolePlayMessage,
     RolePlaySession,
@@ -224,3 +227,54 @@ async def test_owner_can_create_role_play_session_and_turn() -> None:
             )
             await session.execute(delete(User).where(User.id == user.id))
             await session.commit()
+
+
+@pytest.mark.asyncio
+async def test_owner_can_upload_and_range_stream_media() -> None:
+    user = User(
+        email=f"media-{uuid4()}@example.com",
+        password_hash=PasswordHasher().hash("long-test-password"),
+    )
+    async with SessionLocal() as session:
+        session.add(user)
+        await session.commit()
+        await session.refresh(user)
+    headers = {"Authorization": f"Bearer {create_access_token(user.id)}"}
+    stored_name: str | None = None
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            uploaded = await client.post(
+                "/api/owner/immersion/uploads",
+                headers=headers,
+                files={"video": ("fixture.mp4", b"fake-mp4-bytes", "video/mp4")},
+            )
+            assert uploaded.status_code == 202
+            async with SessionLocal() as session:
+                asset = await session.scalar(
+                    select(MediaAsset).where(MediaAsset.import_job_id == uploaded.json()["id"])
+                )
+                assert asset is not None
+                stored_name = asset.stored_name
+                asset_id = asset.id
+            streamed = await client.get(
+                f"/api/owner/immersion/media/{asset_id}",
+                headers={**headers, "Range": "bytes=2-7"},
+            )
+            assert streamed.status_code == 206
+            assert streamed.headers["content-range"] == "bytes 2-7/14"
+            assert streamed.content == b"ke-mp4"
+    finally:
+        async with SessionLocal() as session:
+            assets = (
+                await session.scalars(select(MediaAsset).where(MediaAsset.owner_user_id == user.id))
+            ).all()
+            for asset in assets:
+                stored_name = asset.stored_name
+            await session.execute(delete(MediaAsset).where(MediaAsset.owner_user_id == user.id))
+            await session.execute(
+                delete(ImportJobRecord).where(ImportJobRecord.owner_user_id == user.id)
+            )
+            await session.execute(delete(User).where(User.id == user.id))
+            await session.commit()
+        if stored_name:
+            (Path(get_settings().media_root) / stored_name).unlink(missing_ok=True)

@@ -29,7 +29,7 @@ class VideoImportRequest(BaseModel):
 
 class ImportJob(BaseModel):
     id: UUID = Field(default_factory=uuid4)
-    source_url: HttpUrl
+    source_url: str
     status: ImportStatus = ImportStatus.queued
     progress: int = Field(default=0, ge=0, le=100)
     message: str = "已进入处理队列"
