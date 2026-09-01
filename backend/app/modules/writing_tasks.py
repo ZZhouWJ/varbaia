@@ -31,9 +31,9 @@ async def _evaluate(attempt_id: UUID) -> str:
                 result = await ExternalHttpProvider(get_settings()).evaluate_writing(
                     attempt.prompt, attempt.draft
                 )
-            except Exception as exc:
+            except Exception:
                 attempt.evaluation_status = "failed"
-                attempt.evaluation_error = str(exc)[:500]
+                attempt.evaluation_error = "写作反馈暂不可用，请稍后重试。"
                 await session.commit()
                 return "failed"
             attempt.clarity_score = max(0, min(100, result.clarity_score))

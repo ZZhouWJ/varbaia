@@ -36,7 +36,7 @@ async def _evaluate(attempt_id: UUID) -> str:
                 )
             except PronunciationProviderError as exc:
                 attempt.evaluation_status = "failed"
-                attempt.evaluation_error = f"{exc.category}: {str(exc)}"[:500]
+                attempt.evaluation_error = _public_evaluation_error(exc.category)
                 await session.commit()
                 return "failed"
             except Exception:
@@ -85,3 +85,16 @@ async def _evaluate(attempt_id: UUID) -> str:
 @celery_app.task(name="pronunciation.evaluate", acks_late=True)
 def evaluate_pronunciation(attempt_id: str) -> str:
     return asyncio.run(_evaluate(UUID(attempt_id)))
+
+
+def _public_evaluation_error(category: str) -> str:
+    messages = {
+        "authentication_error": "发音评测鉴权不可用，请联系 Owner 检查服务配置。",
+        "service_unavailable": "发音评测服务暂不可用，请稍后重试。",
+        "invalid_audio": "录音格式或时长不符合要求，请重新录制。",
+        "invalid_reference_text": "参考句子无效，请选择一条英文句子。",
+        "websocket_error": "发音评测连接失败，请稍后重试。",
+        "provider_timeout": "发音评测超时，请稍后重试。",
+        "provider_rate_limit": "发音评测暂时繁忙，请稍后重试。",
+    }
+    return messages.get(category, "发音评测服务发生未预期错误。")

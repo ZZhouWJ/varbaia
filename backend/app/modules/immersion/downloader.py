@@ -43,7 +43,7 @@ async def download_remote_video(
     )
     stdout, stderr = await process.communicate()
     if process.returncode != 0:
-        raise RuntimeError(f"远程视频下载失败：{stderr.decode(errors='replace')[:180]}")
+        raise RuntimeError("远程视频下载失败，请检查来源是否可访问或改为上传文件。")
     lines = [line.strip() for line in stdout.decode(errors="replace").splitlines() if line.strip()]
     if not lines:
         raise RuntimeError("yt-dlp 未返回下载文件路径。")

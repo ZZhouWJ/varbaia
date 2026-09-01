@@ -56,14 +56,14 @@ async def _advance(job_id: UUID, request_id: str | None) -> str:
                             stored_stem=str(uuid4()),
                             max_bytes=settings.max_upload_mb * 1024 * 1024,
                         )
-                    except Exception as exc:
+                    except Exception:
                         job.status, job.progress = "failed", progress
                         session.add(
                             JobEvent(
                                 job_id=job.id,
                                 status="failed",
                                 progress=progress,
-                                message=f"视频下载失败：{str(exc)[:180]}",
+                                message="视频下载失败，请检查链接、来源支持情况或改为上传文件。",
                                 request_id=request_id,
                             )
                         )
@@ -94,14 +94,14 @@ async def _advance(job_id: UUID, request_id: str | None) -> str:
                 try:
                     provider = ExternalHttpProvider(get_settings())
                     segments = await provider.transcribe_english(job.source_url)
-                except Exception as exc:
+                except Exception:
                     job.status, job.progress = "failed", progress
                     session.add(
                         JobEvent(
                             job_id=job.id,
                             status="failed",
                             progress=progress,
-                            message=f"英语转写失败：{str(exc)[:180]}",
+                            message="英语转写暂不可用，请稍后重试或上传字幕文件。",
                             request_id=request_id,
                         )
                     )

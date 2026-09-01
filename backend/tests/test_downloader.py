@@ -15,6 +15,13 @@ class FakeProcess:
         return self.output, b""
 
 
+class FailedProcess(FakeProcess):
+    returncode = 1
+
+    async def communicate(self) -> tuple[bytes, bytes]:
+        return b"", b"provider-secret=must-not-leak"
+
+
 @pytest.mark.asyncio
 async def test_remote_download_accepts_only_media_root_file(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
@@ -36,3 +43,23 @@ async def test_remote_download_accepts_only_media_root_file(
     )
     assert name == "safe-name.mp4"
     assert size == len(b"\x00\x00\x00\x18ftypisomfixture")
+
+
+@pytest.mark.asyncio
+async def test_remote_download_does_not_expose_ytdlp_stderr(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr("app.modules.immersion.downloader.shutil.which", lambda _name: "yt-dlp")
+
+    async def fake_spawn(*_args: object, **_kwargs: object) -> FailedProcess:
+        return FailedProcess(b"")
+
+    with pytest.raises(RuntimeError, match="远程视频下载失败") as error:
+        await download_remote_video(
+            source_url="https://www.youtube.com/watch?v=fixture",
+            media_root=tmp_path,
+            stored_stem="safe-name",
+            max_bytes=1024,
+            spawn=fake_spawn,
+        )
+    assert "provider-secret" not in str(error.value)
