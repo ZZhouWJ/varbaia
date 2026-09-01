@@ -7,7 +7,7 @@ celery_app = Celery(
     "varbaia",
     broker=settings.redis_url,
     backend=settings.redis_url,
-    include=["app.modules.immersion.tasks"],
+    include=["app.modules.immersion.tasks", "app.modules.writing_tasks"],
 )
 celery_app.conf.update(
     task_default_queue="default",

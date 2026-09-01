@@ -74,6 +74,8 @@ class WritingAttempt(Base):
     draft: Mapped[str] = mapped_column(Text)
     clarity_score: Mapped[int | None] = mapped_column(Integer)
     feedback_json: Mapped[str | None] = mapped_column(Text)
+    evaluation_status: Mapped[str] = mapped_column(String(24), default="queued", index=True)
+    evaluation_error: Mapped[str | None] = mapped_column(String(500))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC)
     )

@@ -1,3 +1,4 @@
+import asyncio
 import os
 from uuid import uuid4
 
@@ -13,6 +14,7 @@ from app.core.database import SessionLocal, engine
 from app.core.security import create_access_token
 from app.main import app
 from app.models import ImportJobRecord, ProgressRecord, User, VocabularyItem, WritingAttempt
+from app.modules.writing_tasks import evaluate_writing
 
 
 @pytest.fixture(autouse=True)
@@ -72,11 +74,19 @@ async def test_owner_can_save_and_read_writing_attempt() -> None:
                 json={"prompt": "Describe a memorable journey.", "draft": "I travelled by train."},
             )
             assert created.status_code == 202
+            assert created.json()["evaluation_status"] == "queued"
+            await engine.dispose()
+            result = await asyncio.to_thread(
+                evaluate_writing.apply, args=[created.json()["id"]]
+            )
+            assert result.result == "failed"
             found = await client.get(
                 f"/api/owner/writing/attempts/{created.json()['id']}", headers=headers
             )
             assert found.status_code == 200
             assert found.json()["draft"] == "I travelled by train."
+            assert found.json()["evaluation_status"] == "failed"
+            assert "未配置外部 AI Provider" in found.json()["evaluation_error"]
     finally:
         async with SessionLocal() as session:
             await session.execute(
