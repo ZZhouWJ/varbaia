@@ -101,6 +101,7 @@ export async function getImportEvents(jobId: string): Promise<ImportEvent[]> {
 }
 
 export type DictationResult = { score: number; missed_words: string[]; normalized_answer: string };
+export type RolePlaySession = { id: string; scenario: string; status: string; messages: Array<{ speaker: string; content: string; coaching_tip: string | null }> };
 
 export async function submitDictation(answer: string, reference: string): Promise<DictationResult> {
   const response = await ownerFetch("/owner/dictation/attempts", {
@@ -109,5 +110,21 @@ export async function submitDictation(answer: string, reference: string): Promis
     body: JSON.stringify({ answer, reference }),
   });
   if (!response.ok) throw new Error((await response.json()).detail ?? "听写提交失败");
+  return response.json();
+}
+
+export async function createRolePlaySession(scenario: string): Promise<RolePlaySession> {
+  const response = await ownerFetch("/owner/role-play/sessions", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ scenario }),
+  });
+  if (!response.ok) throw new Error((await response.json()).detail ?? "无法创建角色扮演会话");
+  return response.json();
+}
+
+export async function submitRolePlayTurn(sessionId: string, learnerMessage: string): Promise<RolePlaySession> {
+  const response = await ownerFetch(`/owner/role-play/sessions/${sessionId}/turns`, {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ learner_message: learnerMessage }),
+  });
+  if (!response.ok) throw new Error((await response.json()).detail ?? "角色扮演提交失败");
   return response.json();
 }
