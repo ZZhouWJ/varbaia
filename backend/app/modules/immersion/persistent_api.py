@@ -1,3 +1,4 @@
+import shutil
 from pathlib import Path
 from uuid import UUID, uuid4
 
@@ -11,6 +12,7 @@ from app.core.database import get_session
 from app.models import ImportJobRecord, MediaAsset, TranscriptSegmentRecord, User
 from app.modules.auth import get_owner
 from app.modules.immersion.media import iter_bytes, parse_range, safe_media_path
+from app.modules.immersion.quota import DiskBudget, enforce_disk_budget
 from app.modules.immersion.schemas import (
     ImportJob,
     TranscriptReplace,
@@ -168,6 +170,17 @@ async def upload_media(
     stored_name = f"{uuid4()}{suffix}"
     destination = safe_media_path(root, stored_name)
     limit = settings.max_upload_mb * 1024 * 1024
+    try:
+        declared_size = int(request.headers.get("content-length", "0"))
+    except ValueError:
+        declared_size = 0
+    estimated_size = min(limit, declared_size) if declared_size > 0 else limit
+    enforce_disk_budget(
+        DiskBudget(
+            free_bytes=shutil.disk_usage(root).free,
+            estimated_media_bytes=max(1, estimated_size),
+        )
+    )
     total = 0
     try:
         with destination.open("xb") as target:
