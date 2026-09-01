@@ -1,7 +1,8 @@
 """Celery task for external English role-play replies."""
 
 import asyncio
-from uuid import UUID
+from pathlib import Path
+from uuid import UUID, uuid4
 
 from sqlalchemy import select
 
@@ -10,6 +11,7 @@ from app.core.database import SessionLocal, engine
 from app.core.tasks import celery_app
 from app.models import RolePlayMessage, RolePlaySession
 from app.providers.ai import ExternalHttpProvider
+from app.providers.tencent_speech import TencentEnglishSpeechProvider
 
 
 async def _reply(session_id: UUID) -> str:
@@ -33,8 +35,12 @@ async def _reply(session_id: UUID) -> str:
                 {"speaker": message.speaker, "content": message.content} for message in messages
             ]
             try:
-                reply = await ExternalHttpProvider(get_settings()).reply_to_role_play(
+                settings = get_settings()
+                reply = await ExternalHttpProvider(settings).reply_to_role_play(
                     session.scenario, conversation
+                )
+                speech = await TencentEnglishSpeechProvider(settings).synthesize_english(
+                    reply.reply
                 )
             except Exception:
                 session.status = "failed"
@@ -46,6 +52,8 @@ async def _reply(session_id: UUID) -> str:
                     speaker="assistant",
                     content=reply.reply,
                     coaching_tip=reply.coaching_tip,
+                    audio_stored_name=_store_reply_audio(speech.wav_bytes),
+                    audio_mime_type="audio/wav",
                 )
             )
             session.status = "active"
@@ -58,3 +66,11 @@ async def _reply(session_id: UUID) -> str:
 @celery_app.task(name="role_play.reply", acks_late=True)
 def reply_to_role_play(session_id: str) -> str:
     return asyncio.run(_reply(UUID(session_id)))
+
+
+def _store_reply_audio(wav_bytes: bytes) -> str:
+    root = Path(get_settings().media_root).resolve()
+    root.mkdir(parents=True, exist_ok=True)
+    name = f"role-play-{uuid4()}.wav"
+    (root / name).write_bytes(wav_bytes)
+    return name

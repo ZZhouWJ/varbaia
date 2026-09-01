@@ -197,6 +197,8 @@ class RolePlayMessage(Base):
     speaker: Mapped[str] = mapped_column(String(24))
     content: Mapped[str] = mapped_column(Text)
     coaching_tip: Mapped[str | None] = mapped_column(Text)
+    audio_stored_name: Mapped[str | None] = mapped_column(String(120), unique=True)
+    audio_mime_type: Mapped[str | None] = mapped_column(String(100))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC)
     )
