@@ -113,3 +113,28 @@ class ProgressRecord(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC)
     )
+
+
+class RolePlaySession(Base):
+    __tablename__ = "role_play_sessions"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    owner_user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    scenario: Mapped[str] = mapped_column(String(240))
+    status: Mapped[str] = mapped_column(String(24), default="active")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC)
+    )
+
+
+class RolePlayMessage(Base):
+    __tablename__ = "role_play_messages"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    session_id: Mapped[UUID] = mapped_column(ForeignKey("role_play_sessions.id"), index=True)
+    speaker: Mapped[str] = mapped_column(String(24))
+    content: Mapped[str] = mapped_column(Text)
+    coaching_tip: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC)
+    )
