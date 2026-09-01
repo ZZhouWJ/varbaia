@@ -12,6 +12,8 @@ node_modules/
 .pnpm-store/
 .next/
 coverage/
+test-results/
+playwright-report/
 
 # Python artifacts
 __pycache__/
