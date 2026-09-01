@@ -49,6 +49,7 @@ async function refreshAccessToken(): Promise<string | null> {
 
 export type ImportJob = { id: string; status: string; progress: number; message: string; media_asset_id: string | null };
 export type ImportEvent = { status: string; progress: number; message: string; created_at: string };
+export type TranscriptSegment = { id: string; start_ms: number; end_ms: number; text: string; translation: string | null; order: number };
 
 async function ownerFetch(path: string, init: RequestInit = {}): Promise<Response> {
   let token = getAccessToken();
@@ -104,6 +105,21 @@ export async function getMediaObjectUrl(assetId: string): Promise<string> {
   const response = await ownerFetch(`/owner/immersion/media/${assetId}`);
   if (!response.ok) throw new Error((await response.json()).detail ?? "读取视频失败");
   return URL.createObjectURL(await response.blob());
+}
+
+export async function getTranscript(jobId: string): Promise<TranscriptSegment[]> {
+  const response = await ownerFetch(`/owner/immersion/imports/${jobId}/transcript`);
+  if (!response.ok) throw new Error((await response.json()).detail ?? "读取字幕失败");
+  return response.json();
+}
+
+export async function saveVideoProgress(jobId: string, positionSeconds: number, durationSeconds: number): Promise<void> {
+  const response = await ownerFetch("/owner/progress", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ resource_type: "immersion_video", resource_id: jobId, last_position_seconds: Math.max(0, Math.round(positionSeconds)), completion_percent: durationSeconds > 0 ? Math.min(100, Math.round(positionSeconds / durationSeconds * 100)) : 0 }),
+  });
+  if (!response.ok) throw new Error((await response.json()).detail ?? "保存学习进度失败");
 }
 
 export type DictationResult = { score: number; missed_words: string[]; normalized_answer: string };

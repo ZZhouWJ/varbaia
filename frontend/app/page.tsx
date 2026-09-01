@@ -20,13 +20,14 @@ import {
   Volume2,
   X,
 } from "lucide-react";
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import {
   createUrlImport,
   getAccessToken,
   getImport,
   getImportEvents,
   getMediaObjectUrl,
+  getTranscript,
   getRolePlaySession,
   getWritingAttempt,
   createRolePlaySession,
@@ -37,10 +38,12 @@ import {
   submitRolePlayTurn,
   submitWriting,
   uploadMedia,
+  saveVideoProgress,
   type DictationResult,
   type ImportEvent,
   type ImportJob,
   type RolePlaySession,
+  type TranscriptSegment,
   type WritingAttempt,
 } from "../lib/api";
 
@@ -73,6 +76,8 @@ export default function Home() {
   const [importJob, setImportJob] = useState<ImportJob | null>(null);
   const [importEvents, setImportEvents] = useState<ImportEvent[]>([]);
   const [media, setMedia] = useState<{ assetId: string; url: string } | null>(null);
+  const [transcript, setTranscript] = useState<{ jobId: string; segments: TranscriptSegment[] } | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
   const [rolePlayOpen, setRolePlayOpen] = useState(false);
   const [rolePlay, setRolePlay] = useState<RolePlaySession | null>(null);
   const [roleMessage, setRoleMessage] = useState("");
@@ -80,6 +85,7 @@ export default function Home() {
   const [writing, setWriting] = useState<WritingAttempt | null>(null);
   const [writingDraft, setWritingDraft] = useState("");
   const writingPrompt = "Describe one small change that could make your city more liveable.";
+  const importJobId = importJob?.id;
 
   useEffect(() => {
     document.documentElement.dataset.theme = dark ? "dark" : "light";
@@ -117,6 +123,11 @@ export default function Home() {
     }).catch((error: unknown) => notify(error instanceof Error ? error.message : "无法加载视频"));
     return () => { active = false; if (objectUrl) URL.revokeObjectURL(objectUrl); };
   }, [importJob?.media_asset_id]);
+
+  useEffect(() => {
+    if (!importJobId) return;
+    getTranscript(importJobId).then((segments) => setTranscript({ jobId: importJobId, segments })).catch(() => undefined);
+  }, [importJobId]);
 
   useEffect(() => {
     if (!rolePlay || rolePlay.status !== "waiting_for_reply") return;
@@ -201,6 +212,18 @@ export default function Home() {
     } catch (error) { notify(error instanceof Error ? error.message : "写作提交失败"); }
   }
 
+  function jumpToSegment(segment: TranscriptSegment) {
+    if (!videoRef.current) return;
+    videoRef.current.currentTime = segment.start_ms / 1000;
+    void videoRef.current.play();
+  }
+
+  function persistVideoProgress() {
+    const video = videoRef.current;
+    if (!video || !importJob) return;
+    saveVideoProgress(importJob.id, video.currentTime, video.duration).catch(() => undefined);
+  }
+
   return (
     <main className="app-shell">
       <aside className={`sidebar ${menuOpen ? "sidebar--open" : ""}`} aria-label="主导航">
@@ -242,9 +265,10 @@ export default function Home() {
         {importJob && <p className="import-status" role="status">导入进度：{importJob.progress}% · {importJob.message}</p>}
         {importJob?.status === "failed" && importEvents.length > 0 && <p className="import-error">{importEvents.at(-1)?.message}</p>}
         <article className="lesson-card">
-          <div className="video-cover">{importJob?.media_asset_id && media?.assetId === importJob.media_asset_id ? <video className="lesson-video" controls preload="metadata" src={media.url} /> : <><span className="cover-label">BBC LEARNING</span><button className="play-button" aria-label="播放本课" onClick={() => notify("请先导入本地视频后播放。")}><Play fill="currentColor" /></button><span className="duration">12:48</span></>}</div>
+          <div className="video-cover">{importJob?.media_asset_id && media?.assetId === importJob.media_asset_id ? <video ref={videoRef} className="lesson-video" controls preload="metadata" src={media.url} onPause={persistVideoProgress} onEnded={persistVideoProgress} /> : <><span className="cover-label">BBC LEARNING</span><button className="play-button" aria-label="播放本课" onClick={() => notify("请先导入本地视频后播放。")}><Play fill="currentColor" /></button><span className="duration">12:48</span></>}</div>
           <div className="lesson-detail"><div className="lesson-meta"><span className="tag">B1 · en-GB</span><span>上次学习于今天 09:18</span></div><h3>How cities can become more liveable</h3><p>从城市生活议题中练习观点表达与自然连读。</p><div className="progress-line"><span style={{ width: "62%" }} /></div><div className="lesson-bottom"><strong>已完成 62%</strong><button className="outline-button" onClick={() => setActive("沉浸")}>继续 <ChevronRight size={16} /></button></div></div>
         </article>
+        {importJob?.media_asset_id && media?.assetId === importJob.media_asset_id && transcript?.jobId === importJob.id && transcript.segments.length > 0 && <section className="transcript-panel" aria-label="视频字幕"><p className="eyebrow">INTERACTIVE TRANSCRIPT</p><h2>点击字幕跳转练习</h2><div className="transcript-list">{transcript.segments.map((segment) => <button key={segment.id} onClick={() => jumpToSegment(segment)}><time>{`${Math.floor(segment.start_ms / 60000)}:${String(Math.floor(segment.start_ms / 1000) % 60).padStart(2, "0")}`}</time><span>{segment.text}</span></button>)}</div></section>}
 
         <section className="section-heading practice-heading"><div><p className="eyebrow">ONE SENTENCE AT A TIME</p><h2>今日微练习</h2></div><button className="text-button" onClick={() => { setWriting(null); setWritingOpen(true); }}>写作反馈 <ChevronRight size={16} /></button></section>
         <section className="practice-grid">
