@@ -132,6 +132,9 @@ async def test_owner_can_create_and_review_vocabulary() -> None:
             )
             assert created.status_code == 201
             item_id = created.json()["id"]
+            listed = await client.get("/api/owner/vocabulary/items", headers=headers)
+            assert listed.status_code == 200
+            assert any(item["id"] == item_id for item in listed.json())
             due = await client.get("/api/owner/vocabulary/due", headers=headers)
             assert any(item["id"] == item_id for item in due.json())
             reviewed = await client.post(

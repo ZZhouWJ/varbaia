@@ -96,6 +96,21 @@ async def list_due_vocabulary(
     return [VocabularyResponse.model_validate(item, from_attributes=True) for item in items]
 
 
+@router.get("/items", response_model=list[VocabularyResponse])
+async def list_vocabulary_items(
+    owner: User = Depends(get_owner),
+    session: AsyncSession = Depends(get_session),
+) -> list[VocabularyResponse]:
+    items = (
+        await session.scalars(
+            select(VocabularyItem)
+            .where(VocabularyItem.owner_user_id == owner.id)
+            .order_by(VocabularyItem.next_review_at, VocabularyItem.term)
+        )
+    ).all()
+    return [VocabularyResponse.model_validate(item, from_attributes=True) for item in items]
+
+
 @router.post("/items/{item_id}/review/{grade}", response_model=VocabularyResponse)
 async def review_vocabulary(
     item_id: UUID,
