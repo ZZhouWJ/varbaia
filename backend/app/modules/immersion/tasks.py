@@ -5,9 +5,11 @@ from uuid import UUID
 
 from sqlalchemy import select
 
+from app.core.config import get_settings
 from app.core.database import SessionLocal, engine
 from app.core.tasks import celery_app
-from app.models import ImportJobRecord, JobEvent
+from app.models import ImportJobRecord, JobEvent, TranscriptSegmentRecord
+from app.providers.ai import ExternalHttpProvider
 
 STEPS = [
     ("validating", 8, "正在验证导入地址"),
@@ -39,6 +41,40 @@ async def _advance(job_id: UUID, request_id: str | None) -> str:
                 )
             )
             await session.commit()
+            if next_status == "transcribing":
+                try:
+                    provider = ExternalHttpProvider(get_settings())
+                    segments = await provider.transcribe_english(job.source_url)
+                except Exception as exc:
+                    job.status, job.progress = "failed", progress
+                    session.add(
+                        JobEvent(
+                            job_id=job.id,
+                            status="failed",
+                            progress=progress,
+                            message=f"英语转写失败：{str(exc)[:180]}",
+                            request_id=request_id,
+                        )
+                    )
+                    await session.commit()
+                    return "failed"
+                await session.execute(
+                    TranscriptSegmentRecord.__table__.delete().where(
+                        TranscriptSegmentRecord.import_job_id == job.id
+                    )
+                )
+                session.add_all(
+                    TranscriptSegmentRecord(
+                        import_job_id=job.id,
+                        position=index,
+                        start_ms=round(float(segment["start"]) * 1000),
+                        end_ms=round(float(segment["end"]) * 1000),
+                        text=str(segment["text"]),
+                    )
+                    for index, segment in enumerate(segments)
+                    if float(segment["end"]) > float(segment["start"])
+                )
+                await session.commit()
             return next_status
     finally:
         await engine.dispose()
