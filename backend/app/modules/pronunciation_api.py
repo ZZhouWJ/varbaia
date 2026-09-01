@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -37,7 +37,7 @@ def response_of(attempt: PronunciationAttempt) -> AttemptResponse:
 
 @router.post("/attempts", response_model=AttemptResponse, status_code=status.HTTP_202_ACCEPTED)
 async def create_attempt(
-    reference_text: str,
+    reference_text: str = Form(...),
     audio: UploadFile = File(...),
     owner: User = Depends(get_owner),
     session: AsyncSession = Depends(get_session),

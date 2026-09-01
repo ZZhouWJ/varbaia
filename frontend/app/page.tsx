@@ -29,6 +29,7 @@ import {
   getMediaObjectUrl,
   getTranscript,
   getRolePlaySession,
+  getPronunciationAttempt,
   getWritingAttempt,
   createRolePlaySession,
   listImports,
@@ -38,6 +39,7 @@ import {
   submitDictation,
   submitRolePlayTurn,
   submitWriting,
+  submitPronunciation,
   uploadMedia,
   saveVideoProgress,
   reviewVocabulary,
@@ -48,6 +50,7 @@ import {
   type TranscriptSegment,
   type WritingAttempt,
   type VocabularyItem,
+  type PronunciationAttempt,
 } from "../lib/api";
 
 type Section = "今日" | "沉浸" | "复习" | "词库" | "我";
@@ -88,6 +91,11 @@ export default function Home() {
   const [writing, setWriting] = useState<WritingAttempt | null>(null);
   const [writingDraft, setWritingDraft] = useState("");
   const [vocabulary, setVocabulary] = useState<VocabularyItem[]>([]);
+  const [shadowingOpen, setShadowingOpen] = useState(false);
+  const [recording, setRecording] = useState(false);
+  const [recordedAudio, setRecordedAudio] = useState<Blob | null>(null);
+  const [pronunciation, setPronunciation] = useState<PronunciationAttempt | null>(null);
+  const recorderRef = useRef<MediaRecorder | null>(null);
   const writingPrompt = "Describe one small change that could make your city more liveable.";
   const importJobId = importJob?.id;
 
@@ -159,6 +167,12 @@ export default function Home() {
     }, 1800);
     return () => window.clearInterval(timer);
   }, [writing]);
+
+  useEffect(() => {
+    if (!pronunciation || !["queued", "processing"].includes(pronunciation.evaluation_status)) return;
+    const timer = window.setInterval(() => getPronunciationAttempt(pronunciation.id).then(setPronunciation).catch(() => undefined), 1800);
+    return () => window.clearInterval(timer);
+  }, [pronunciation]);
 
   function notify(message: string) {
     setToast(message);
@@ -243,6 +257,24 @@ export default function Home() {
     } catch (error) { notify(error instanceof Error ? error.message : "保存复习结果失败"); }
   }
 
+  async function toggleRecording() {
+    if (recorderRef.current?.state === "recording") { recorderRef.current.stop(); return; }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const chunks: BlobPart[] = [];
+      const recorder = new MediaRecorder(stream);
+      recorder.ondataavailable = (event) => chunks.push(event.data);
+      recorder.onstop = () => { stream.getTracks().forEach((track) => track.stop()); setRecordedAudio(new Blob(chunks, { type: recorder.mimeType || "audio/webm" })); setRecording(false); };
+      recorderRef.current = recorder; recorder.start(); setRecording(true);
+    } catch (error) { notify(error instanceof Error ? "无法使用麦克风，请检查浏览器权限。" : "无法使用麦克风。"); }
+  }
+
+  async function submitShadowing() {
+    if (!recordedAudio) return;
+    try { setPronunciation(await submitPronunciation("The best way to learn is to stay curious.", recordedAudio)); }
+    catch (error) { notify(error instanceof Error ? error.message : "跟读提交失败"); }
+  }
+
   return (
     <main className="app-shell">
       <aside className={`sidebar ${menuOpen ? "sidebar--open" : ""}`} aria-label="主导航">
@@ -294,7 +326,7 @@ export default function Home() {
           {practiceSteps.map((step, index) => {
             const icons = [Headphones, Volume2, Mic2, Send];
             const Icon = icons[index];
-            return <button className="practice-card" key={step} onClick={() => step === "角色扮演" ? openRolePlay() : notify(`${step}练习已准备好。`)}><span className="practice-index">0{index + 1}</span><Icon aria-hidden /><strong>{step}</strong><small>{["听懂语块", "补全句子", "模仿节奏", "开口回应"][index]}</small></button>;
+            return <button className="practice-card" key={step} onClick={() => step === "角色扮演" ? openRolePlay() : step === "跟读" ? setShadowingOpen(true) : notify(`${step}练习已准备好。`)}><span className="practice-index">0{index + 1}</span><Icon aria-hidden /><strong>{step}</strong><small>{["听懂语块", "补全句子", "模仿节奏", "开口回应"][index]}</small></button>;
           })}
         </section>
 
@@ -312,6 +344,7 @@ export default function Home() {
       {loginOpen && <div className="modal-layer" role="dialog" aria-modal="true" aria-labelledby="login-title"><button className="scrim" aria-label="关闭登录窗口" onClick={() => setLoginOpen(false)} /><form className="import-modal" onSubmit={submitLogin}><div className="modal-heading"><div><p className="eyebrow">OWNER ACCESS</p><h2 id="login-title">{signedIn ? "个人学习空间" : "登录个人学习空间"}</h2></div><button type="button" className="icon-button" aria-label="关闭" onClick={() => setLoginOpen(false)}><X /></button></div>{signedIn ? <div className="modal-actions"><button className="text-button" type="button" onClick={signOut}>退出登录</button></div> : <><label htmlFor="owner-email">邮箱</label><input id="owner-email" name="email" type="email" required /><label htmlFor="owner-password">密码</label><input id="owner-password" name="password" type="password" minLength={12} required /><div className="modal-actions"><button className="primary-button" type="submit">登录</button></div></>}</form></div>}
       {rolePlayOpen && rolePlay && <div className="modal-layer" role="dialog" aria-modal="true" aria-labelledby="role-play-title"><button className="scrim" aria-label="关闭角色扮演" onClick={() => setRolePlayOpen(false)} /><form className="import-modal" onSubmit={sendRolePlay}><div className="modal-heading"><div><p className="eyebrow">ROLE PLAY</p><h2 id="role-play-title">{rolePlay.scenario}</h2></div><button type="button" className="icon-button" aria-label="关闭" onClick={() => setRolePlayOpen(false)}><X /></button></div><p className="form-note">用英语点一杯咖啡。{rolePlay.status === "waiting_for_reply" ? "AI 正在准备回复…" : rolePlay.status === "failed" ? "AI 回复失败，请稍后重试。" : ""}</p>{rolePlay.messages.map((message, index) => <p className="role-message" key={index}><strong>{message.speaker === "learner" ? "你" : "AI"}：</strong>{message.content}</p>)}<label htmlFor="role-message">你的英文回应</label><input id="role-message" value={roleMessage} onChange={(event) => setRoleMessage(event.target.value)} placeholder="Could I have a latte, please?" /><div className="modal-actions"><button className="primary-button" disabled={rolePlay.status === "waiting_for_reply"} type="submit">发送</button></div></form></div>}
       {writingOpen && <div className="modal-layer" role="dialog" aria-modal="true" aria-labelledby="writing-title"><button className="scrim" aria-label="关闭写作反馈" onClick={() => setWritingOpen(false)} /><form className="import-modal" onSubmit={sendWriting}><div className="modal-heading"><div><p className="eyebrow">WRITING CHECK</p><h2 id="writing-title">用英语表达观点</h2></div><button type="button" className="icon-button" aria-label="关闭" onClick={() => setWritingOpen(false)}><X /></button></div><p className="writing-prompt">{writingPrompt}</p><label htmlFor="writing-draft">你的回答</label><textarea id="writing-draft" value={writingDraft} onChange={(event) => setWritingDraft(event.target.value)} placeholder="I think my city could..." minLength={20} required />{["queued", "processing"].includes(writing?.evaluation_status ?? "") ? <p className="form-note">正在生成逐条反馈…</p> : null}{writing?.evaluation_status === "failed" && <p className="import-error">{writing.evaluation_error ?? "反馈生成失败，请稍后重试。"}</p>}{writing?.feedback && <div className="writing-feedback"><strong>{writing.clarity_score === null ? "反馈已生成" : `清晰度 ${writing.clarity_score} 分`}</strong>{writing.feedback.suggestions?.map((suggestion) => <p key={suggestion}>{suggestion}</p>)}{writing.feedback.corrected_draft && <p><em>更自然的表达：</em>{writing.feedback.corrected_draft}</p>}</div>}<div className="modal-actions"><button className="primary-button" disabled={["queued", "processing"].includes(writing?.evaluation_status ?? "")} type="submit">获取反馈</button></div></form></div>}
+      {shadowingOpen && <div className="modal-layer" role="dialog" aria-modal="true" aria-labelledby="shadowing-title"><button className="scrim" aria-label="关闭跟读" onClick={() => setShadowingOpen(false)} /><div className="import-modal"><div className="modal-heading"><div><p className="eyebrow">SHADOWING</p><h2 id="shadowing-title">录下这一句</h2></div><button className="icon-button" aria-label="关闭" onClick={() => setShadowingOpen(false)}><X /></button></div><p className="writing-prompt">The best way to learn is to stay curious.</p><button className="primary-button" onClick={toggleRecording}>{recording ? "停止录音" : "开始录音"}</button>{recordedAudio && <p className="form-note">录音已准备好，可提交进行英语发音评分。</p>}{pronunciation?.evaluation_status === "failed" && <p className="import-error">{pronunciation.evaluation_error}</p>}{pronunciation?.result && <div className="writing-feedback"><strong>评分结果</strong><p>{JSON.stringify(pronunciation.result)}</p></div>}<div className="modal-actions"><button className="primary-button" disabled={!recordedAudio || ["queued", "processing"].includes(pronunciation?.evaluation_status ?? "")} onClick={submitShadowing}>提交评分</button></div></div></div>}
       {toast && <div className="toast" role="status"><Check size={18} /> {toast}</div>}
     </main>
   );
