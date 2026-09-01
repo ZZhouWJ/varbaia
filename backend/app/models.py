@@ -63,3 +63,17 @@ class JobEvent(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC)
     )
+
+
+class WritingAttempt(Base):
+    __tablename__ = "writing_attempts"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    owner_user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    prompt: Mapped[str] = mapped_column(Text)
+    draft: Mapped[str] = mapped_column(Text)
+    clarity_score: Mapped[int | None] = mapped_column(Integer)
+    feedback_json: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC)
+    )
