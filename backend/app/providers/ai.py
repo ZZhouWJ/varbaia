@@ -45,7 +45,10 @@ class ExternalHttpProvider:
             "messages": [
                 {
                     "role": "system",
-                    "content": "Return concise English-learning writing feedback as JSON.",
+                    "content": (
+                        "Return ONLY a JSON object with clarity_score (integer 0-100), "
+                        "corrected_draft (string), and suggestions (array of concise strings)."
+                    ),
                 },
                 {"role": "user", "content": f"Prompt: {prompt}\nDraft: {draft}"},
             ],
