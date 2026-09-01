@@ -59,8 +59,13 @@ import {
   type VocabularyItem,
   type PronunciationAttempt,
 } from "../lib/api";
+import {
+  loadLearningState,
+  saveLearningState,
+  type LearningSection,
+} from "../lib/learning-state";
 
-type Section = "今日" | "沉浸" | "复习" | "词库" | "我";
+type Section = LearningSection;
 
 const navigation: { label: Section; icon: typeof Compass }[] = [
   { label: "今日", icon: Compass },
@@ -105,6 +110,7 @@ export default function Home() {
   const [recording, setRecording] = useState(false);
   const [recordedAudio, setRecordedAudio] = useState<Blob | null>(null);
   const [pronunciation, setPronunciation] = useState<PronunciationAttempt | null>(null);
+  const [learningStateReady, setLearningStateReady] = useState(false);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const roleRecorderRef = useRef<MediaRecorder | null>(null);
   const writingPrompt = "Describe one small change that could make your city more liveable.";
@@ -113,6 +119,23 @@ export default function Home() {
   useEffect(() => {
     document.documentElement.dataset.theme = dark ? "dark" : "light";
   }, [dark]);
+
+  useEffect(() => {
+    const restored = loadLearningState(window.localStorage);
+    const frame = window.requestAnimationFrame(() => {
+      if (restored.active) setActive(restored.active);
+      if (restored.dark !== undefined) setDark(restored.dark);
+      if (restored.dictation !== undefined) setDictation(restored.dictation);
+      if (restored.writingDraft !== undefined) setWritingDraft(restored.writingDraft);
+      setLearningStateReady(true);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
+
+  useEffect(() => {
+    if (!learningStateReady) return;
+    saveLearningState(window.localStorage, { active, dark, dictation, writingDraft });
+  }, [active, dark, dictation, learningStateReady, writingDraft]);
 
   useEffect(() => {
     if (!signedIn) return;
