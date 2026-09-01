@@ -27,8 +27,41 @@ def test_soe_n_signing_keeps_english_engine_and_hides_secret_key() -> None:
         ),
         timestamp=100,
         nonce=9,
+        voice_id="voice-123",
     )
     assert "server_engine_type=16k_en" in target.url
     assert "secretid=secret-id" in target.url
     assert "private-key" not in target.url
     assert "signature=" in target.url
+    assert "voice_id=voice-123" in target.url
+    assert target.voice_id == "voice-123"
+
+
+def test_soe_n_creates_unique_nonempty_voice_id_for_each_connection() -> None:
+    settings = Settings(
+        _env_file=None,
+        tencentcloud_app_id="123456",
+        tencentcloud_secret_id="secret-id",
+        tencentcloud_secret_key="private-key",
+    )
+    first = signed_soe_n_handshake_target(settings, timestamp=100)
+    second = signed_soe_n_handshake_target(settings, timestamp=100)
+    assert first.voice_id and second.voice_id
+    assert first.voice_id != second.voice_id
+    assert len(first.voice_id) <= 128
+    assert f"voice_id={first.voice_id}" in first.url
+
+
+def test_soe_n_rejects_overlong_voice_id() -> None:
+    settings = Settings(
+        _env_file=None,
+        tencentcloud_app_id="123456",
+        tencentcloud_secret_id="secret-id",
+        tencentcloud_secret_key="private-key",
+    )
+    try:
+        signed_soe_n_handshake_target(settings, voice_id="x" * 129)
+    except ValueError as exc:
+        assert "128" in str(exc)
+    else:
+        raise AssertionError("expected voice_id length validation")

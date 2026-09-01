@@ -12,6 +12,7 @@ import hmac
 import time
 from dataclasses import dataclass
 from urllib.parse import quote, urlencode
+from uuid import uuid4
 
 import websockets
 
@@ -24,6 +25,7 @@ SOE_N_HOST = "soe.cloud.tencent.com"
 class SoeNHandshakeTarget:
     url: str
     server_engine_type: str
+    voice_id: str | None = None
 
 
 def soe_n_handshake_target(settings: Settings) -> SoeNHandshakeTarget:
@@ -37,19 +39,28 @@ def soe_n_handshake_target(settings: Settings) -> SoeNHandshakeTarget:
 
 
 def signed_soe_n_handshake_target(
-    settings: Settings, *, timestamp: int | None = None, nonce: int = 0
+    settings: Settings,
+    *,
+    timestamp: int | None = None,
+    nonce: int = 0,
+    voice_id: str | None = None,
 ) -> SoeNHandshakeTarget:
     """Build the SOE-N HMAC-SHA1 signed WebSocket handshake URL."""
     target = soe_n_handshake_target(settings)
     if not settings.tencentcloud_secret_id or not settings.tencentcloud_secret_key:
         raise RuntimeError("未配置腾讯云密钥，无法签名 SOE-N WebSocket 请求。")
     now = int(time.time()) if timestamp is None else timestamp
+    current_voice_id = voice_id or str(uuid4())
+    if not current_voice_id or len(current_voice_id) > 128:
+        raise ValueError("SOE-N voice_id 必须为 1 到 128 个字符。")
     params = {
         "expired": str(now + 3600),
         "nonce": str(nonce),
         "secretid": settings.tencentcloud_secret_id,
         "server_engine_type": target.server_engine_type,
         "timestamp": str(now),
+        "voice_format": "0",
+        "voice_id": current_voice_id,
     }
     query = urlencode(sorted(params.items()))
     path = target.url.removeprefix(f"wss://{SOE_N_HOST}")
@@ -60,6 +71,7 @@ def signed_soe_n_handshake_target(
     return SoeNHandshakeTarget(
         url=f"{target.url}?{query}&signature={quote(signature, safe='')}",
         server_engine_type=target.server_engine_type,
+        voice_id=current_voice_id,
     )
 
 
