@@ -28,8 +28,9 @@ from app.models import (
     VocabularyItem,
     WritingAttempt,
 )
+from app.modules.role_play_tasks import evaluate_role_play
 from app.modules.writing_tasks import evaluate_writing
-from app.providers.ai import WritingEvaluation
+from app.providers.ai import RolePlayFeedback, WritingEvaluation
 
 
 @pytest.fixture(autouse=True)
@@ -275,6 +276,88 @@ async def test_owner_can_create_role_play_session_and_turn() -> None:
             assert turn.status_code == 202
             assert turn.json()["status"] == "waiting_for_reply"
             assert turn.json()["messages"][0]["speaker"] == "learner"
+    finally:
+        async with SessionLocal() as session:
+            session_ids = select(RolePlaySession.id).where(
+                RolePlaySession.owner_user_id == user.id
+            )
+            await session.execute(
+                delete(RolePlayMessage).where(RolePlayMessage.session_id.in_(session_ids))
+            )
+            await session.execute(
+                delete(RolePlaySession).where(RolePlaySession.owner_user_id == user.id)
+            )
+            await session.execute(delete(User).where(User.id == user.id))
+            await session.commit()
+
+
+@pytest.mark.asyncio
+async def test_owner_can_complete_role_play_and_read_feedback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def fake_evaluate_role_play(
+        _self: object, _scenario: str, _conversation: list[dict[str, str]]
+    ) -> RolePlayFeedback:
+        return RolePlayFeedback(
+            task_completion=90,
+            grammar=85,
+            vocabulary=82,
+            fluency=80,
+            pronunciation=None,
+            naturalness=88,
+            key_corrections=["Use 'a latte' after 'have'."],
+            better_expressions=["Could I get a latte, please?"],
+        )
+
+    monkeypatch.setattr(
+        "app.providers.ai.ExternalHttpProvider.evaluate_role_play", fake_evaluate_role_play
+    )
+    user = User(
+        email=f"role-feedback-{uuid4()}@example.com",
+        password_hash=PasswordHasher().hash("long-test-password"),
+    )
+    async with SessionLocal() as session:
+        session.add(user)
+        await session.commit()
+        await session.refresh(user)
+    headers = {"Authorization": f"Bearer {create_access_token(user.id)}"}
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            created = await client.post(
+                "/api/owner/role-play/sessions",
+                headers=headers,
+                json={"scenario": "Ordering coffee at a busy cafe"},
+            )
+            session_id = created.json()["id"]
+            turn = await client.post(
+                f"/api/owner/role-play/sessions/{session_id}/turns",
+                headers=headers,
+                json={"learner_message": "Could I have latte, please?"},
+            )
+            assert turn.status_code == 202
+            completing = await client.post(
+                f"/api/owner/role-play/sessions/{session_id}/complete", headers=headers
+            )
+            assert completing.status_code == 202
+            assert completing.json()["status"] == "evaluating"
+            await engine.dispose()
+            result = await asyncio.to_thread(evaluate_role_play.apply, args=[session_id])
+            assert result.result == "complete"
+            found = await client.get(
+                f"/api/owner/role-play/sessions/{session_id}", headers=headers
+            )
+            assert found.status_code == 200
+            assert found.json()["status"] == "complete"
+            assert found.json()["feedback"] == {
+                "task_completion": 90,
+                "grammar": 85,
+                "vocabulary": 82,
+                "fluency": 80,
+                "pronunciation": None,
+                "naturalness": 88,
+                "key_corrections": ["Use 'a latte' after 'have'."],
+                "better_expressions": ["Could I get a latte, please?"],
+            }
     finally:
         async with SessionLocal() as session:
             session_ids = select(RolePlaySession.id).where(

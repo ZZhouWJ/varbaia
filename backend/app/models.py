@@ -208,6 +208,7 @@ class RolePlaySession(Base):
     owner_user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)
     scenario: Mapped[str] = mapped_column(String(240))
     status: Mapped[str] = mapped_column(String(24), default="active")
+    feedback_json: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC)
     )

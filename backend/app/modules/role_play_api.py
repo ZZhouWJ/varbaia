@@ -1,3 +1,4 @@
+import json
 from datetime import datetime
 from pathlib import Path
 from uuid import UUID, uuid4
@@ -12,7 +13,7 @@ from app.core.config import get_settings
 from app.core.database import get_session
 from app.models import RolePlayMessage, RolePlaySession, User
 from app.modules.auth import get_owner
-from app.modules.role_play_tasks import reply_to_role_play
+from app.modules.role_play_tasks import evaluate_role_play, reply_to_role_play
 from app.providers.audio_normalization import normalize_audio
 from app.providers.pronunciation import PronunciationProviderError
 from app.providers.tencent_speech import TencentEnglishSpeechProvider
@@ -42,6 +43,7 @@ class SessionResponse(BaseModel):
     scenario: str
     status: str
     messages: list[MessageResponse]
+    feedback: dict[str, object] | None
 
 
 async def get_owned_session(session_id: UUID, owner_id: UUID, db: AsyncSession) -> RolePlaySession:
@@ -78,6 +80,7 @@ async def to_response(item: RolePlaySession, db: AsyncSession) -> SessionRespons
             )
             for message in messages
         ],
+        feedback=json.loads(item.feedback_json) if item.feedback_json else None,
     )
 
 
@@ -106,6 +109,21 @@ async def add_learner_turn(
     item.status = "waiting_for_reply"
     await db.commit()
     reply_to_role_play.delay(str(item.id))
+    return await to_response(item, db)
+
+
+@router.post("/sessions/{session_id}/complete", response_model=SessionResponse, status_code=202)
+async def complete_session(
+    session_id: UUID,
+    owner: User = Depends(get_owner),
+    db: AsyncSession = Depends(get_session),
+) -> SessionResponse:
+    item = await get_owned_session(session_id, owner.id, db)
+    if item.status in {"complete", "evaluating"}:
+        return await to_response(item, db)
+    item.status = "evaluating"
+    await db.commit()
+    evaluate_role_play.delay(str(item.id))
     return await to_response(item, db)
 
 

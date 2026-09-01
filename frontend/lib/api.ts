@@ -134,7 +134,22 @@ export type PronunciationResult = {
 };
 export type PronunciationAttempt = { id: string; reference_text: string; evaluation_status: string; result: PronunciationResult | null; evaluation_error: string | null };
 export type LearnerMemoryItem = { id: string; category: "pronunciation" | "listening" | "vocabulary" | "grammar" | "fluency" | "writing"; title: string; detail: string; source_type: string; occurrence_count: number; severity: number; status: string; last_seen_at: string };
-export type RolePlaySession = { id: string; scenario: string; status: string; messages: Array<{ id: string; speaker: string; content: string; coaching_tip: string | null; audio_available: boolean }> };
+export type RolePlaySession = {
+  id: string;
+  scenario: string;
+  status: string;
+  messages: Array<{ id: string; speaker: string; content: string; coaching_tip: string | null; audio_available: boolean }>;
+  feedback: {
+    task_completion: number;
+    grammar: number;
+    vocabulary: number;
+    fluency: number | null;
+    pronunciation: number | null;
+    naturalness: number;
+    key_corrections: string[];
+    better_expressions: string[];
+  } | null;
+};
 export type WritingAttempt = {
   id: string;
   prompt: string;
@@ -168,6 +183,14 @@ export async function submitRolePlayTurn(sessionId: string, learnerMessage: stri
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ learner_message: learnerMessage }),
   });
   if (!response.ok) throw new Error((await response.json()).detail ?? "角色扮演提交失败");
+  return response.json();
+}
+
+export async function completeRolePlaySession(sessionId: string): Promise<RolePlaySession> {
+  const response = await ownerFetch(`/owner/role-play/sessions/${sessionId}/complete`, {
+    method: "POST",
+  });
+  if (!response.ok) throw new Error((await response.json()).detail ?? "无法生成角色扮演反馈");
   return response.json();
 }
 

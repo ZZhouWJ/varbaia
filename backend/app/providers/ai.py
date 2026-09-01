@@ -25,6 +25,18 @@ class RolePlayReply:
     coaching_tip: str
 
 
+@dataclass(frozen=True)
+class RolePlayFeedback:
+    task_completion: int
+    grammar: int
+    vocabulary: int
+    fluency: int | None
+    pronunciation: int | None
+    naturalness: int
+    key_corrections: list[str]
+    better_expressions: list[str]
+
+
 class EnglishLearningProvider(Protocol):
     async def evaluate_writing(self, prompt: str, draft: str) -> WritingEvaluation: ...
 
@@ -33,6 +45,10 @@ class EnglishLearningProvider(Protocol):
     async def reply_to_role_play(
         self, scenario: str, conversation: list[dict[str, str]]
     ) -> RolePlayReply: ...
+
+    async def evaluate_role_play(
+        self, scenario: str, conversation: list[dict[str, str]]
+    ) -> RolePlayFeedback: ...
 
 
 class ExternalHttpProvider:
@@ -131,6 +147,48 @@ class ExternalHttpProvider:
 
         data = json.loads(response.json()["choices"][0]["message"]["content"])
         return RolePlayReply(reply=str(data["reply"]), coaching_tip=str(data["coaching_tip"]))
+
+    async def evaluate_role_play(
+        self, scenario: str, conversation: list[dict[str, str]]
+    ) -> RolePlayFeedback:
+        if not self.base_url or not self.api_key:
+            raise RuntimeError("未配置外部 AI Provider，无法评价角色扮演。")
+        payload = {
+            "model": self.settings.ai_model or "configured-by-provider",
+            "messages": [
+                {
+                    "role": "system",
+                    "content": (
+                        "Return ONLY JSON with integer 0-100 task_completion, grammar, vocabulary, "
+                        "naturalness; optional integer fluency/pronunciation only when supported; "
+                        "key_corrections and better_expressions arrays. "
+                        "Assess English role play only."
+                    ),
+                },
+                {"role": "user", "content": f"Scenario: {scenario}\nConversation: {conversation}"},
+            ],
+            "response_format": {"type": "json_object"},
+        }
+        async with httpx.AsyncClient(timeout=45) as client:
+            response = await client.post(
+                f"{self.base_url}/chat/completions",
+                headers={"Authorization": f"Bearer {self.api_key}"},
+                json=payload,
+            )
+            response.raise_for_status()
+        import json
+
+        data = json.loads(response.json()["choices"][0]["message"]["content"])
+        return RolePlayFeedback(
+            task_completion=max(0, min(100, int(data["task_completion"]))),
+            grammar=max(0, min(100, int(data["grammar"]))),
+            vocabulary=max(0, min(100, int(data["vocabulary"]))),
+            fluency=_optional_score(data.get("fluency")),
+            pronunciation=_optional_score(data.get("pronunciation")),
+            naturalness=max(0, min(100, int(data["naturalness"]))),
+            key_corrections=[str(item) for item in data.get("key_corrections", [])],
+            better_expressions=[str(item) for item in data.get("better_expressions", [])],
+        )
 
 
 def _optional_score(value: object) -> int | None:
