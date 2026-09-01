@@ -28,6 +28,7 @@ import {
   listImports,
   login,
   submitDictation,
+  uploadMedia,
   type DictationResult,
   type ImportJob,
 } from "../lib/api";
@@ -88,10 +89,15 @@ export default function Home() {
 
   async function submitImport(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const sourceUrl = new FormData(event.currentTarget).get("source_url")?.toString() ?? "";
+    const formData = new FormData(event.currentTarget);
+    const sourceUrl = formData.get("source_url")?.toString() ?? "";
+    const file = formData.get("video_file");
     setSubmitting(true);
     try {
-      const job = await createUrlImport(sourceUrl);
+      if (!sourceUrl && !(file instanceof File && file.size > 0)) {
+        throw new Error("请粘贴 HTTPS 视频链接或选择视频文件");
+      }
+      const job = file instanceof File && file.size > 0 ? await uploadMedia(file) : await createUrlImport(sourceUrl);
       setImportJob(job);
       setDialogOpen(false);
       notify("视频已加入处理队列，正在准备学习材料。");
@@ -172,7 +178,7 @@ export default function Home() {
 
       <nav className="bottom-nav" aria-label="移动端主导航">{navigation.map(({ label, icon: Icon }) => <button key={label} className={active === label ? "is-active" : ""} onClick={() => setActive(label)}><Icon size={20} /><span>{label}</span></button>)}</nav>
 
-      {dialogOpen && <div className="modal-layer" role="dialog" aria-modal="true" aria-labelledby="import-title"><button className="scrim" aria-label="关闭导入窗口" onClick={() => setDialogOpen(false)} /><form className="import-modal" onSubmit={submitImport}><div className="modal-heading"><div><p className="eyebrow">NEW IMMERSION</p><h2 id="import-title">导入一段英语视频</h2></div><button type="button" className="icon-button" aria-label="关闭" onClick={() => setDialogOpen(false)}><X /></button></div><label htmlFor="video-url">HTTPS 视频链接</label><input id="video-url" name="source_url" type="url" required placeholder="https://www.youtube.com/watch?..." /><p className="form-note">当前仅接收已授权的平台链接；导入后会异步生成英语片段与练习。</p><div className="modal-actions"><button type="button" className="text-button" onClick={() => setDialogOpen(false)}>取消</button><button className="primary-button" disabled={submitting} type="submit">{submitting ? "提交中…" : "加入队列"} <ChevronRight size={17} /></button></div></form></div>}
+      {dialogOpen && <div className="modal-layer" role="dialog" aria-modal="true" aria-labelledby="import-title"><button className="scrim" aria-label="关闭导入窗口" onClick={() => setDialogOpen(false)} /><form className="import-modal" onSubmit={submitImport}><div className="modal-heading"><div><p className="eyebrow">NEW IMMERSION</p><h2 id="import-title">导入一段英语视频</h2></div><button type="button" className="icon-button" aria-label="关闭" onClick={() => setDialogOpen(false)}><X /></button></div><label htmlFor="video-url">HTTPS 视频链接</label><input id="video-url" name="source_url" type="url" placeholder="https://www.youtube.com/watch?..." /><p className="form-note">或选择本地视频文件（MP4、WebM、MOV、M4V）。二选一即可。</p><label htmlFor="video-file">视频文件</label><input id="video-file" name="video_file" type="file" accept="video/mp4,video/webm,video/quicktime,video/x-m4v" /><p className="form-note">导入后会异步生成英语片段与练习。</p><div className="modal-actions"><button type="button" className="text-button" onClick={() => setDialogOpen(false)}>取消</button><button className="primary-button" disabled={submitting} type="submit">{submitting ? "提交中…" : "加入队列"} <ChevronRight size={17} /></button></div></form></div>}
       {loginOpen && <div className="modal-layer" role="dialog" aria-modal="true" aria-labelledby="login-title"><button className="scrim" aria-label="关闭登录窗口" onClick={() => setLoginOpen(false)} /><form className="import-modal" onSubmit={submitLogin}><div className="modal-heading"><div><p className="eyebrow">OWNER ACCESS</p><h2 id="login-title">登录个人学习空间</h2></div><button type="button" className="icon-button" aria-label="关闭" onClick={() => setLoginOpen(false)}><X /></button></div><label htmlFor="owner-email">邮箱</label><input id="owner-email" name="email" type="email" required /><label htmlFor="owner-password">密码</label><input id="owner-password" name="password" type="password" minLength={12} required /><div className="modal-actions"><button className="primary-button" type="submit">登录</button></div></form></div>}
       {toast && <div className="toast" role="status"><Check size={18} /> {toast}</div>}
     </main>

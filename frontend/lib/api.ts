@@ -60,6 +60,14 @@ export async function createUrlImport(sourceUrl: string): Promise<ImportJob> {
   return response.json();
 }
 
+export async function uploadMedia(video: File): Promise<ImportJob> {
+  const body = new FormData();
+  body.append("video", video);
+  const response = await ownerFetch("/owner/immersion/uploads", { method: "POST", body });
+  if (!response.ok) throw new Error((await response.json()).detail ?? "上传失败");
+  return response.json();
+}
+
 export async function getImport(jobId: string): Promise<ImportJob> {
   const response = await ownerFetch(`/owner/immersion/imports/${jobId}`);
   if (!response.ok) throw new Error((await response.json()).detail ?? "读取导入进度失败");
