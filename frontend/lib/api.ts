@@ -60,9 +60,10 @@ export async function createUrlImport(sourceUrl: string): Promise<ImportJob> {
   return response.json();
 }
 
-export async function uploadMedia(video: File): Promise<ImportJob> {
+export async function uploadMedia(video: File, subtitle?: File): Promise<ImportJob> {
   const body = new FormData();
   body.append("video", video);
+  if (subtitle) body.append("subtitle", subtitle);
   const response = await ownerFetch("/owner/immersion/uploads", { method: "POST", body });
   if (!response.ok) throw new Error((await response.json()).detail ?? "上传失败");
   return response.json();
