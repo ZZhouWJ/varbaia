@@ -92,6 +92,24 @@ class TranscriptSegmentRecord(Base):
     translation: Mapped[str | None] = mapped_column(Text)
 
 
+class DictationAttempt(Base):
+    __tablename__ = "dictation_attempts"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    owner_user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    import_job_id: Mapped[UUID | None] = mapped_column(ForeignKey("import_jobs.id"), index=True)
+    segment_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("transcript_segments.id"), index=True
+    )
+    answer: Mapped[str] = mapped_column(Text)
+    reference: Mapped[str] = mapped_column(Text)
+    score: Mapped[int] = mapped_column(Integer)
+    missed_words_json: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC)
+    )
+
+
 class WritingAttempt(Base):
     __tablename__ = "writing_attempts"
 
