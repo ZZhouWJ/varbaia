@@ -20,7 +20,18 @@ async def test_health_endpoints_and_legacy_demo_routes_are_not_exposed() -> None
 
         legacy = await client.post("/api/practice/dictation", json={})
         assert legacy.status_code == 404
+        assert legacy.json()["error"] == {
+            "code": "NOT_FOUND",
+            "message": "Not Found",
+            "request_id": legacy.headers["x-request-id"],
+            "retryable": False,
+            "details": None,
+        }
         assert (await client.get("/api/health")).status_code == 404
+
+        invalid_login = await client.post("/api/v1/auth/login", json={})
+        assert invalid_login.status_code == 422
+        assert invalid_login.json()["error"]["code"] == "VALIDATION_ERROR"
 
 
 @pytest.mark.asyncio

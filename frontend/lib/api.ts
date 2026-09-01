@@ -1,6 +1,18 @@
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000/api/v1";
 const tokenKey = "varbaia_access_token";
 
+type ApiErrorPayload = {
+  error?: { message?: unknown };
+  detail?: unknown;
+};
+
+async function responseError(response: Response, fallback: string): Promise<string> {
+  const payload: ApiErrorPayload | null = await response.json().catch(() => null);
+  if (typeof payload?.error?.message === "string") return payload.error.message;
+  if (typeof payload?.detail === "string") return payload.detail;
+  return fallback;
+}
+
 export function getAccessToken(): string | null {
   return window.localStorage.getItem(tokenKey);
 }
@@ -16,7 +28,7 @@ export async function login(email: string, password: string): Promise<void> {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, password }),
   });
-  if (!response.ok) throw new Error((await response.json()).detail ?? "登录失败");
+  if (!response.ok) throw new Error(await responseError(response, "登录失败"));
   const body = await response.json();
   window.localStorage.setItem(tokenKey, body.access_token);
 }
@@ -70,7 +82,7 @@ export async function createUrlImport(sourceUrl: string): Promise<ImportJob> {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ source_url: sourceUrl, accent: "en-US" }),
   });
-  if (!response.ok) throw new Error((await response.json()).detail ?? "导入失败");
+  if (!response.ok) throw new Error(await responseError(response, "导入失败"));
   return response.json();
 }
 
@@ -79,49 +91,49 @@ export async function uploadMedia(video: File, subtitle?: File): Promise<ImportJ
   body.append("video", video);
   if (subtitle) body.append("subtitle", subtitle);
   const response = await ownerFetch("/owner/immersion/uploads", { method: "POST", body });
-  if (!response.ok) throw new Error((await response.json()).detail ?? "上传失败");
+  if (!response.ok) throw new Error(await responseError(response, "上传失败"));
   return response.json();
 }
 
 export async function getImport(jobId: string): Promise<ImportJob> {
   const response = await ownerFetch(`/owner/immersion/imports/${jobId}`);
-  if (!response.ok) throw new Error((await response.json()).detail ?? "读取导入进度失败");
+  if (!response.ok) throw new Error(await responseError(response, "读取导入进度失败"));
   return response.json();
 }
 
 export async function cancelImport(jobId: string): Promise<ImportJob> {
   const response = await ownerFetch(`/owner/immersion/imports/${jobId}/cancel`, { method: "POST" });
-  if (!response.ok) throw new Error((await response.json()).detail ?? "取消导入失败");
+  if (!response.ok) throw new Error(await responseError(response, "取消导入失败"));
   return response.json();
 }
 
 export async function retryImport(jobId: string): Promise<ImportJob> {
   const response = await ownerFetch(`/owner/immersion/imports/${jobId}/retry`, { method: "POST" });
-  if (!response.ok) throw new Error((await response.json()).detail ?? "重新导入失败");
+  if (!response.ok) throw new Error(await responseError(response, "重新导入失败"));
   return response.json();
 }
 
 export async function listImports(): Promise<ImportJob[]> {
   const response = await ownerFetch("/owner/immersion/imports");
-  if (!response.ok) throw new Error((await response.json()).detail ?? "读取导入列表失败");
+  if (!response.ok) throw new Error(await responseError(response, "读取导入列表失败"));
   return response.json();
 }
 
 export async function getImportEvents(jobId: string): Promise<ImportEvent[]> {
   const response = await ownerFetch(`/owner/immersion/imports/${jobId}/events`);
-  if (!response.ok) throw new Error((await response.json()).detail ?? "读取任务事件失败");
+  if (!response.ok) throw new Error(await responseError(response, "读取任务事件失败"));
   return response.json();
 }
 
 export async function getMediaObjectUrl(assetId: string): Promise<string> {
   const response = await ownerFetch(`/owner/immersion/media/${assetId}`);
-  if (!response.ok) throw new Error((await response.json()).detail ?? "读取视频失败");
+  if (!response.ok) throw new Error(await responseError(response, "读取视频失败"));
   return URL.createObjectURL(await response.blob());
 }
 
 export async function getTranscript(jobId: string): Promise<TranscriptSegment[]> {
   const response = await ownerFetch(`/owner/immersion/imports/${jobId}/transcript`);
-  if (!response.ok) throw new Error((await response.json()).detail ?? "读取字幕失败");
+  if (!response.ok) throw new Error(await responseError(response, "读取字幕失败"));
   return response.json();
 }
 
@@ -131,7 +143,7 @@ export async function saveVideoProgress(jobId: string, positionSeconds: number, 
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ resource_type: "immersion_video", resource_id: jobId, last_position_seconds: Math.max(0, Math.round(positionSeconds)), completion_percent: durationSeconds > 0 ? Math.min(100, Math.round(positionSeconds / durationSeconds * 100)) : 0 }),
   });
-  if (!response.ok) throw new Error((await response.json()).detail ?? "保存学习进度失败");
+  if (!response.ok) throw new Error(await responseError(response, "保存学习进度失败"));
 }
 
 export type DictationResult = { score: number; missed_words: string[]; normalized_answer: string };
@@ -178,7 +190,7 @@ export async function submitDictation(answer: string, reference: string): Promis
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ answer, reference }),
   });
-  if (!response.ok) throw new Error((await response.json()).detail ?? "听写提交失败");
+  if (!response.ok) throw new Error(await responseError(response, "听写提交失败"));
   return response.json();
 }
 
@@ -186,7 +198,7 @@ export async function createRolePlaySession(scenario: string): Promise<RolePlayS
   const response = await ownerFetch("/owner/role-play/sessions", {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ scenario }),
   });
-  if (!response.ok) throw new Error((await response.json()).detail ?? "无法创建角色扮演会话");
+  if (!response.ok) throw new Error(await responseError(response, "无法创建角色扮演会话"));
   return response.json();
 }
 
@@ -194,7 +206,7 @@ export async function submitRolePlayTurn(sessionId: string, learnerMessage: stri
   const response = await ownerFetch(`/owner/role-play/sessions/${sessionId}/turns`, {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ learner_message: learnerMessage }),
   });
-  if (!response.ok) throw new Error((await response.json()).detail ?? "角色扮演提交失败");
+  if (!response.ok) throw new Error(await responseError(response, "角色扮演提交失败"));
   return response.json();
 }
 
@@ -202,7 +214,7 @@ export async function completeRolePlaySession(sessionId: string): Promise<RolePl
   const response = await ownerFetch(`/owner/role-play/sessions/${sessionId}/complete`, {
     method: "POST",
   });
-  if (!response.ok) throw new Error((await response.json()).detail ?? "无法生成角色扮演反馈");
+  if (!response.ok) throw new Error(await responseError(response, "无法生成角色扮演反馈"));
   return response.json();
 }
 
@@ -210,19 +222,19 @@ export async function submitRolePlayVoiceTurn(sessionId: string, audio: Blob): P
   const body = new FormData();
   body.append("audio", audio, "role-play.webm");
   const response = await ownerFetch(`/owner/role-play/sessions/${sessionId}/voice-turns`, { method: "POST", body });
-  if (!response.ok) throw new Error((await response.json()).detail ?? "语音角色扮演提交失败");
+  if (!response.ok) throw new Error(await responseError(response, "语音角色扮演提交失败"));
   return response.json();
 }
 
 export async function getRolePlayAudioUrl(sessionId: string, messageId: string): Promise<string> {
   const response = await ownerFetch(`/owner/role-play/sessions/${sessionId}/messages/${messageId}/audio`);
-  if (!response.ok) throw new Error((await response.json()).detail ?? "读取角色扮演语音失败");
+  if (!response.ok) throw new Error(await responseError(response, "读取角色扮演语音失败"));
   return URL.createObjectURL(await response.blob());
 }
 
 export async function getRolePlaySession(sessionId: string): Promise<RolePlaySession> {
   const response = await ownerFetch(`/owner/role-play/sessions/${sessionId}`);
-  if (!response.ok) throw new Error((await response.json()).detail ?? "读取角色扮演会话失败");
+  if (!response.ok) throw new Error(await responseError(response, "读取角色扮演会话失败"));
   return response.json();
 }
 
@@ -232,42 +244,42 @@ export async function submitWriting(prompt: string, content: string): Promise<Wr
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ prompt, draft: content }),
   });
-  if (!response.ok) throw new Error((await response.json()).detail ?? "写作提交失败");
+  if (!response.ok) throw new Error(await responseError(response, "写作提交失败"));
   return response.json();
 }
 
 export async function getWritingAttempt(attemptId: string): Promise<WritingAttempt> {
   const response = await ownerFetch(`/owner/writing/attempts/${attemptId}`);
-  if (!response.ok) throw new Error((await response.json()).detail ?? "读取写作反馈失败");
+  if (!response.ok) throw new Error(await responseError(response, "读取写作反馈失败"));
   return response.json();
 }
 
 export async function listVocabularyItems(): Promise<VocabularyItem[]> {
   const response = await ownerFetch("/owner/vocabulary/items");
-  if (!response.ok) throw new Error((await response.json()).detail ?? "读取词库失败");
+  if (!response.ok) throw new Error(await responseError(response, "读取词库失败"));
   return response.json();
 }
 
 export async function listLearnerMemory(): Promise<LearnerMemoryItem[]> {
   const response = await ownerFetch("/owner/memory");
-  if (!response.ok) throw new Error((await response.json()).detail ?? "读取学习记忆失败");
+  if (!response.ok) throw new Error(await responseError(response, "读取学习记忆失败"));
   return response.json();
 }
 
 export async function markLearnerMemoryMastered(memoryId: string): Promise<LearnerMemoryItem> {
   const response = await ownerFetch(`/owner/memory/${memoryId}/master`, { method: "POST" });
-  if (!response.ok) throw new Error((await response.json()).detail ?? "更新学习记忆失败");
+  if (!response.ok) throw new Error(await responseError(response, "更新学习记忆失败"));
   return response.json();
 }
 
 export async function deleteLearnerMemory(memoryId: string): Promise<void> {
   const response = await ownerFetch(`/owner/memory/${memoryId}`, { method: "DELETE" });
-  if (!response.ok) throw new Error((await response.json()).detail ?? "删除学习记忆失败");
+  if (!response.ok) throw new Error(await responseError(response, "删除学习记忆失败"));
 }
 
 export async function reviewVocabulary(itemId: string, grade: "again" | "hard" | "good" | "easy"): Promise<VocabularyItem> {
   const response = await ownerFetch(`/owner/vocabulary/items/${itemId}/review/${grade}`, { method: "POST" });
-  if (!response.ok) throw new Error((await response.json()).detail ?? "保存复习结果失败");
+  if (!response.ok) throw new Error(await responseError(response, "保存复习结果失败"));
   return response.json();
 }
 
@@ -276,12 +288,12 @@ export async function submitPronunciation(referenceText: string, audio: Blob): P
   body.append("reference_text", referenceText);
   body.append("audio", audio, "shadowing.webm");
   const response = await ownerFetch("/owner/pronunciation/attempts", { method: "POST", body });
-  if (!response.ok) throw new Error((await response.json()).detail ?? "跟读提交失败");
+  if (!response.ok) throw new Error(await responseError(response, "跟读提交失败"));
   return response.json();
 }
 
 export async function getPronunciationAttempt(attemptId: string): Promise<PronunciationAttempt> {
   const response = await ownerFetch(`/owner/pronunciation/attempts/${attemptId}`);
-  if (!response.ok) throw new Error((await response.json()).detail ?? "读取跟读结果失败");
+  if (!response.ok) throw new Error(await responseError(response, "读取跟读结果失败"));
   return response.json();
 }
