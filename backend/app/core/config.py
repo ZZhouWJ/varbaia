@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     tencentcloud_tts_voice_type: str = ""
     media_root: str = "./data/media"
     max_upload_mb: int = 500
+    backup_destination: str = ""
 
     @property
     def allowed_origins(self) -> list[str]:

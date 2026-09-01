@@ -18,11 +18,14 @@ def live_health() -> dict[str, str]:
 
 
 @router.get("/health/ready", tags=["system"])
-async def ready_health() -> dict[str, str]:
+async def ready_health(settings: Settings = Depends(get_settings)) -> dict[str, str]:
     try:
         async with engine.connect() as connection:
             await connection.execute(text("SELECT 1"))
     except Exception as exc:
         raise HTTPException(status_code=503, detail="数据库尚未就绪") from exc
-    return {"status": "ok", "database": "ready"}
-
+    return {
+        "status": "ok",
+        "database": "ready",
+        "backup": "configured" if settings.backup_destination else "not_configured",
+    }

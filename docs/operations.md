@@ -3,7 +3,7 @@
 ## 部署前检查
 
 1. 安装 Docker Compose v2，并确认宿主 Nginx 已占用并管理 80/443。
-2. 在仓库根目录复制 `backend/.env.example` 为 `.env`，设置 32 字符以上的 `JWT_SECRET`、外部 AI Provider 配置和腾讯云凭据（`TENCENTCLOUD_SECRET_ID`、`TENCENTCLOUD_SECRET_KEY`、`TENCENTCLOUD_APP_ID`、英语 ASR / TTS 参数）；根目录 `.env` 是本地与 Compose 唯一读取的私密配置文件。
+2. 在仓库根目录复制 `backend/.env.example` 为 `.env`，设置 32 字符以上的 `JWT_SECRET`、外部 AI Provider 配置、腾讯云凭据（`TENCENTCLOUD_SECRET_ID`、`TENCENTCLOUD_SECRET_KEY`、`TENCENTCLOUD_APP_ID`、英语 ASR / TTS 参数）和位于服务器外部挂载位置的 `BACKUP_DESTINATION`；根目录 `.env` 是本地与 Compose 唯一读取的私密配置文件。
 3. 复制 `infra/.env.example` 为 `infra/.env`，设置强随机 `POSTGRES_PASSWORD`。
 4. 在 `infra/` 执行 `docker compose --env-file ../.env up -d --build`；Backend 会先执行
    `alembic upgrade head`，端口必须只绑定 `127.0.0.1`。
@@ -14,17 +14,18 @@ Backend 镜像会安装 FFmpeg 和项目锁定的 `yt-dlp`。首次验收请分�
 
 ## 备份
 
-在 `infra/` 中执行，备份文件必须复制至主机外的受控位置：
+备份文件必须写至服务器外部的受控挂载位置；`/api/health/ready` 会显示 `backup=not_configured`，直至设置 `BACKUP_DESTINATION`。使用仓库提供的脚本：
 
 ```bash
-docker compose exec -T postgres pg_dump -U varbaia -d varbaia | gzip > varbaia-$(date +%F).sql.gz
-docker compose exec -T redis redis-cli SAVE
+cd infra
+BACKUP_DESTINATION=/mnt/remote-backups/varbaia sh ./scripts/backup.sh
 ```
 
-恢复前先停止 Worker 与 Backend，确认备份来源与日期；恢复到空数据库后执行：
+恢复前先停止 Worker 与 Backend，确认备份来源与日期，并恢复到空数据库：
 
 ```bash
-gunzip -c varbaia-YYYY-MM-DD.sql.gz | docker compose exec -T postgres psql -U varbaia -d varbaia
+cd infra
+sh ./scripts/restore.sh /mnt/remote-backups/varbaia/varbaia-postgres-YYYYMMDDTHHMMSSZ.sql.gz
 ```
 
 完成后启动服务、检查健康端点，并用 Owner 登录验证数据。媒体对象、数据库备份和 `.env` 应采用独立加密备份策略；绝不把它们提交到 Git。
