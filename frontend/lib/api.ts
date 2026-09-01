@@ -21,15 +21,33 @@ export async function login(email: string, password: string): Promise<void> {
   window.localStorage.setItem(tokenKey, body.access_token);
 }
 
+async function refreshAccessToken(): Promise<string | null> {
+  const response = await fetch(`${apiBaseUrl}/auth/refresh`, {
+    method: "POST",
+    credentials: "include",
+  });
+  if (!response.ok) {
+    clearAccessToken();
+    return null;
+  }
+  const body = await response.json();
+  window.localStorage.setItem(tokenKey, body.access_token);
+  return body.access_token;
+}
+
 export type ImportJob = { id: string; status: string; progress: number; message: string };
 
 async function ownerFetch(path: string, init: RequestInit = {}): Promise<Response> {
-  const token = getAccessToken();
+  let token = getAccessToken();
   if (!token) throw new Error("请先登录 Owner 账户");
-  return fetch(`${apiBaseUrl}${path}`, {
+  const request = () => fetch(`${apiBaseUrl}${path}`, {
     ...init,
     headers: { ...init.headers, Authorization: `Bearer ${token}` },
   });
+  let response = await request();
+  if (response.status === 401 && (token = await refreshAccessToken())) response = await request();
+  if (response.status === 401) throw new Error("登录已过期，请重新登录");
+  return response;
 }
 
 export async function createUrlImport(sourceUrl: string): Promise<ImportJob> {
