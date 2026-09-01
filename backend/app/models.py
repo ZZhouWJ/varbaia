@@ -110,6 +110,22 @@ class DictationAttempt(Base):
     )
 
 
+class PronunciationAttempt(Base):
+    __tablename__ = "pronunciation_attempts"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    owner_user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    reference_text: Mapped[str] = mapped_column(Text)
+    stored_name: Mapped[str] = mapped_column(String(120), unique=True)
+    mime_type: Mapped[str] = mapped_column(String(100))
+    evaluation_status: Mapped[str] = mapped_column(String(24), default="queued", index=True)
+    result_json: Mapped[str | None] = mapped_column(Text)
+    evaluation_error: Mapped[str | None] = mapped_column(String(500))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC)
+    )
+
+
 class WritingAttempt(Base):
     __tablename__ = "writing_attempts"
 

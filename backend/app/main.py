@@ -7,6 +7,7 @@ from app.modules.auth import router as auth_router
 from app.modules.dictation_api import router as dictation_router
 from app.modules.immersion.persistent_api import router as persistent_immersion_router
 from app.modules.progress_api import router as progress_router
+from app.modules.pronunciation_api import router as pronunciation_router
 from app.modules.role_play_api import router as role_play_router
 from app.modules.vocabulary_api import router as vocabulary_router
 from app.modules.writing_api import router as writing_router
@@ -29,6 +30,7 @@ def create_app() -> FastAPI:
     app.include_router(writing_router, prefix="/api")
     app.include_router(vocabulary_router, prefix="/api")
     app.include_router(progress_router, prefix="/api")
+    app.include_router(pronunciation_router, prefix="/api")
     app.include_router(role_play_router, prefix="/api")
     return app
 

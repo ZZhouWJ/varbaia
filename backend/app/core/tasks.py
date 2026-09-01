@@ -11,6 +11,7 @@ celery_app = Celery(
         "app.modules.immersion.tasks",
         "app.modules.writing_tasks",
         "app.modules.role_play_tasks",
+        "app.modules.pronunciation_tasks",
     ],
 )
 celery_app.conf.update(
