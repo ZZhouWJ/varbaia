@@ -32,6 +32,7 @@ class Settings(BaseSettings):
     media_root: str = "./data/media"
     max_upload_mb: int = 500
     backup_destination: str = ""
+    log_level: str = "INFO"
 
     @property
     def allowed_origins(self) -> list[str]:

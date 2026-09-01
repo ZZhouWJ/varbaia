@@ -10,6 +10,10 @@ async def test_health_endpoints_and_legacy_demo_routes_are_not_exposed() -> None
         health = await client.get("/api/health")
         assert health.status_code == 200
         assert health.json()["status"] == "ok"
+        assert health.headers["x-request-id"]
+
+        traced = await client.get("/api/health", headers={"x-request-id": "test-request-42"})
+        assert traced.headers["x-request-id"] == "test-request-42"
 
         live = await client.get("/api/health/live")
         assert live.status_code == 200

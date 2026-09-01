@@ -50,7 +50,10 @@ async def test_owner_can_create_and_read_persistent_import() -> None:
         session.add(user)
         await session.commit()
         await session.refresh(user)
-    headers = {"Authorization": f"Bearer {create_access_token(user.id)}"}
+    headers = {
+        "Authorization": f"Bearer {create_access_token(user.id)}",
+        "X-Request-ID": "persistent-import-test",
+    }
     try:
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             created = await client.post(
@@ -72,6 +75,10 @@ async def test_owner_can_create_and_read_persistent_import() -> None:
             assert cancelled.status_code == 200
             assert cancelled.json()["status"] == "cancelled"
             assert cancelled.json()["message"] == "导入已取消"
+            events = await client.get(
+                f"/api/owner/immersion/imports/{job_id}/events", headers=headers
+            )
+            assert events.json()[-1]["status"] == "cancelled"
             retried = await client.post(
                 f"/api/owner/immersion/imports/{job_id}/retry", headers=headers
             )

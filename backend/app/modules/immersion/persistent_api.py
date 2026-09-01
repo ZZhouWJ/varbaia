@@ -68,7 +68,7 @@ async def create_persistent_import(
     session.add(job)
     await session.commit()
     await session.refresh(job)
-    import_media.delay(str(job.id), request.headers.get("x-request-id"))
+    import_media.delay(str(job.id), request.state.request_id)
     return to_schema(job)
 
 
@@ -154,6 +154,7 @@ async def media_asset_id_for(job: ImportJobRecord, session: AsyncSession) -> UUI
 @router.post("/imports/{job_id}/cancel", response_model=ImportJob)
 async def cancel_persistent_import(
     job_id: UUID,
+    request: Request,
     owner: User = Depends(get_owner),
     session: AsyncSession = Depends(get_session),
 ) -> ImportJob:
@@ -162,7 +163,13 @@ async def cancel_persistent_import(
         return to_schema(job, await media_asset_id_for(job, session))
     job.status = "cancelled"
     session.add(
-        JobEvent(job_id=job.id, status="cancelled", progress=job.progress, message="已取消导入任务")
+        JobEvent(
+            job_id=job.id,
+            status="cancelled",
+            progress=job.progress,
+            message="已取消导入任务",
+            request_id=request.state.request_id,
+        )
     )
     await session.commit()
     return to_schema(job, await media_asset_id_for(job, session))
@@ -182,9 +189,17 @@ async def retry_persistent_import(
         raise HTTPException(status_code=409, detail="仅失败或已取消的导入任务可以重试")
     job.status = "queued"
     job.progress = 0
-    session.add(JobEvent(job_id=job.id, status="queued", progress=0, message="已重新加入导入队列"))
+    session.add(
+        JobEvent(
+            job_id=job.id,
+            status="queued",
+            progress=0,
+            message="已重新加入导入队列",
+            request_id=request.state.request_id,
+        )
+    )
     await session.commit()
-    import_media.delay(str(job.id), request.headers.get("x-request-id"))
+    import_media.delay(str(job.id), request.state.request_id)
     return to_schema(job, await media_asset_id_for(job, session))
 
 
@@ -322,7 +337,7 @@ async def upload_media(
         await video.close()
         if subtitle is not None:
             await subtitle.close()
-    import_media.delay(str(job.id), request.headers.get("x-request-id"))
+    import_media.delay(str(job.id), request.state.request_id)
     return to_schema(job, asset.id)
 
 
