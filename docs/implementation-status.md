@@ -14,6 +14,6 @@
 
 ## Definition of Done 审计（2026-09-01）
 
-已具备运行证据：单 Owner 创建/登录/刷新/退出基础，PostgreSQL migration，Redis + Celery 状态链，URL SSRF 防护，磁盘预算规则，yt-dlp 远程下载 Adapter 与签名/大小边界，导入/写作/词汇/学习进度/Learner Memory/角色扮演结束反馈的 Owner 持久化接口及本机 PostgreSQL 集成测试，受鉴权本地视频播放、Range、字幕跳转与断点保存，浏览器录音、腾讯云英语 ASR/TTS Role Play 链路与发音异步任务，腾讯云 SOE-N 英文句子评测 Adapter（含已验证 signer、Mock WebSocket 生命周期、正式字段映射与音频边界校验），结构化写作反馈、响应式壳、浅深主题、焦点与 Reduced Motion，前后端基础测试、生产构建和 1280/375 首页 Playwright E2E。
+已具备运行证据：单 Owner 创建/登录/刷新/退出基础，PostgreSQL migration，Redis + Celery 状态链，URL SSRF 防护，磁盘预算规则，yt-dlp 远程下载 Adapter 与签名/大小边界，导入/写作/词汇/学习进度/Learner Memory/角色扮演结束反馈的 Owner 持久化接口及本机 PostgreSQL 集成测试，受鉴权本地视频播放、Range、字幕跳转与断点保存，浏览器录音、腾讯云英语 ASR/TTS Role Play 链路与发音异步任务，腾讯云 SOE-N 英文句子评测 Adapter（含已验证 signer、Mock WebSocket 生命周期、正式字段映射与音频边界校验），结构化写作反馈、响应式壳、浅深主题、焦点与 Reduced Motion，前后端基础测试、生产构建和 standalone 模式下的 Playwright 响应式首页与 Owner Mock 学习闭环 E2E。
 
 尚未完成，不能作为发布条件：一次真实 URL 媒体下载与云端英语 STT、一次真实 SOE-N 音频端到端评分、一次真实语音 Role Play、Docker build 与从空目录部署、备份恢复、完整核心 E2E，以及服务器部署验收。后续开发和最终邮件均以这些项目完成并取得运行证据为前提。
