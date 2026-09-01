@@ -1,8 +1,10 @@
 from datetime import UTC, datetime, timedelta
+from math import floor
+from typing import Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -23,8 +25,46 @@ class VocabularyResponse(BaseModel):
     term: str
     definition: str
     interval_days: int
+    ease: float
     repetitions: int
     next_review_at: datetime
+
+    @field_validator("ease", mode="before")
+    @classmethod
+    def convert_ease_from_percentage(cls, value: int) -> float:
+        return value / 100
+
+
+ReviewGrade = Literal["again", "hard", "good", "easy"]
+
+
+def schedule_review(item: VocabularyItem, grade: ReviewGrade) -> None:
+    """Mirror frontend/lib/review.ts while storing ease as an integer percentage."""
+    current_ease = item.ease / 100
+    if grade == "again":
+        item.interval_days = 1
+        item.ease = floor(max(1.3, current_ease - 0.2) * 100 + 0.5)
+        item.repetitions = 0
+        return
+
+    multiplier = 1.3 if grade == "easy" else 0.75 if grade == "hard" else 1
+    next_ease = (
+        current_ease + 0.15
+        if grade == "easy"
+        else max(1.3, current_ease - 0.15)
+        if grade == "hard"
+        else current_ease
+    )
+    base = (
+        1
+        if item.repetitions == 0
+        else 3
+        if item.repetitions == 1
+        else item.interval_days * next_ease
+    )
+    item.interval_days = max(1, floor(base * multiplier + 0.5))
+    item.ease = floor(next_ease * 100 + 0.5)
+    item.repetitions += 1
 
 
 @router.post("/items", response_model=VocabularyResponse, status_code=status.HTTP_201_CREATED)
@@ -59,7 +99,7 @@ async def list_due_vocabulary(
 @router.post("/items/{item_id}/review/{grade}", response_model=VocabularyResponse)
 async def review_vocabulary(
     item_id: UUID,
-    grade: str,
+    grade: ReviewGrade,
     owner: User = Depends(get_owner),
     session: AsyncSession = Depends(get_session),
 ) -> VocabularyResponse:
@@ -70,14 +110,7 @@ async def review_vocabulary(
     )
     if item is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="未找到词汇")
-    if grade not in {"again", "hard", "good", "easy"}:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="无效复习等级"
-        )
-    item.repetitions = 0 if grade == "again" else item.repetitions + 1
-    item.interval_days = (
-        1 if grade == "again" else max(1, item.interval_days * (2 if grade == "easy" else 1))
-    )
+    schedule_review(item, grade)
     item.next_review_at = datetime.now(UTC) + timedelta(days=item.interval_days)
     await session.commit()
     await session.refresh(item)
