@@ -124,7 +124,15 @@ export async function saveVideoProgress(jobId: string, positionSeconds: number, 
 
 export type DictationResult = { score: number; missed_words: string[]; normalized_answer: string };
 export type VocabularyItem = { id: string; term: string; definition: string; interval_days: number; ease: number; repetitions: number; next_review_at: string };
-export type PronunciationAttempt = { id: string; reference_text: string; evaluation_status: string; result: Record<string, unknown> | null; evaluation_error: string | null };
+export type PronunciationResult = {
+  overall_score: number | null;
+  pronunciation_accuracy: number | null;
+  pronunciation_fluency: number | null;
+  pronunciation_completion: number | null;
+  word_results: Array<{ text: string | null; start_time_ms: number | null; end_time_ms: number | null; pronunciation_accuracy: number | null; pronunciation_fluency: number | null; match_tag: number | null }>;
+  phone_results: Array<{ text: string | null; start_time_ms: number | null; end_time_ms: number | null; pronunciation_accuracy: number | null; match_tag: number | null }>;
+};
+export type PronunciationAttempt = { id: string; reference_text: string; evaluation_status: string; result: PronunciationResult | null; evaluation_error: string | null };
 export type LearnerMemoryItem = { id: string; category: "pronunciation" | "listening" | "vocabulary" | "grammar" | "fluency" | "writing"; title: string; detail: string; source_type: string; occurrence_count: number; severity: number; status: string; last_seen_at: string };
 export type RolePlaySession = { id: string; scenario: string; status: string; messages: Array<{ id: string; speaker: string; content: string; coaching_tip: string | null; audio_available: boolean }> };
 export type WritingAttempt = {
