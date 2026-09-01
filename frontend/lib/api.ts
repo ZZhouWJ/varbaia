@@ -66,6 +66,12 @@ export async function getImport(jobId: string): Promise<ImportJob> {
   return response.json();
 }
 
+export async function listImports(): Promise<ImportJob[]> {
+  const response = await ownerFetch("/owner/immersion/imports");
+  if (!response.ok) throw new Error((await response.json()).detail ?? "读取导入列表失败");
+  return response.json();
+}
+
 export type DictationResult = { score: number; missed_words: string[]; normalized_answer: string };
 
 export async function submitDictation(answer: string, reference: string): Promise<DictationResult> {

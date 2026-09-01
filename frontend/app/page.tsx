@@ -25,6 +25,7 @@ import {
   createUrlImport,
   getAccessToken,
   getImport,
+  listImports,
   login,
   submitDictation,
   type DictationResult,
@@ -62,6 +63,13 @@ export default function Home() {
   useEffect(() => {
     document.documentElement.dataset.theme = dark ? "dark" : "light";
   }, [dark]);
+
+  useEffect(() => {
+    if (!signedIn) return;
+    listImports()
+      .then((jobs) => setImportJob((current) => current ?? jobs[0] ?? null))
+      .catch((error: unknown) => notify(error instanceof Error ? error.message : "无法恢复导入任务"));
+  }, [signedIn]);
 
   useEffect(() => {
     if (!importJob || ["ready", "failed", "cancelled"].includes(importJob.status)) return;
