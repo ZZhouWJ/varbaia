@@ -40,6 +40,8 @@ def to_schema(record: ImportJobRecord, media_asset_id: UUID | None = None) -> Im
         message = "学习材料已就绪"
     elif record.status == "failed":
         message = "导入失败，请查看任务事件"
+    elif record.status == "cancelled":
+        message = "导入已取消"
     else:
         message = "任务处理中"
     return ImportJob(
@@ -143,6 +145,47 @@ async def get_owned_import(job_id: UUID, owner_id: UUID, session: AsyncSession) 
     if job is None:
         raise HTTPException(status_code=404, detail="未找到导入任务")
     return job
+
+
+async def media_asset_id_for(job: ImportJobRecord, session: AsyncSession) -> UUID | None:
+    return await session.scalar(select(MediaAsset.id).where(MediaAsset.import_job_id == job.id))
+
+
+@router.post("/imports/{job_id}/cancel", response_model=ImportJob)
+async def cancel_persistent_import(
+    job_id: UUID,
+    owner: User = Depends(get_owner),
+    session: AsyncSession = Depends(get_session),
+) -> ImportJob:
+    job = await get_owned_import(job_id, owner.id, session)
+    if job.status in {"ready", "failed", "cancelled"}:
+        return to_schema(job, await media_asset_id_for(job, session))
+    job.status = "cancelled"
+    session.add(
+        JobEvent(job_id=job.id, status="cancelled", progress=job.progress, message="已取消导入任务")
+    )
+    await session.commit()
+    return to_schema(job, await media_asset_id_for(job, session))
+
+
+@router.post(
+    "/imports/{job_id}/retry", response_model=ImportJob, status_code=status.HTTP_202_ACCEPTED
+)
+async def retry_persistent_import(
+    job_id: UUID,
+    request: Request,
+    owner: User = Depends(get_owner),
+    session: AsyncSession = Depends(get_session),
+) -> ImportJob:
+    job = await get_owned_import(job_id, owner.id, session)
+    if job.status not in {"failed", "cancelled"}:
+        raise HTTPException(status_code=409, detail="仅失败或已取消的导入任务可以重试")
+    job.status = "queued"
+    job.progress = 0
+    session.add(JobEvent(job_id=job.id, status="queued", progress=0, message="已重新加入导入队列"))
+    await session.commit()
+    import_media.delay(str(job.id), request.headers.get("x-request-id"))
+    return to_schema(job, await media_asset_id_for(job, session))
 
 
 @router.put("/imports/{job_id}/transcript", response_model=list[TranscriptSegment])

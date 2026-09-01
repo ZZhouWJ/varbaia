@@ -89,6 +89,18 @@ export async function getImport(jobId: string): Promise<ImportJob> {
   return response.json();
 }
 
+export async function cancelImport(jobId: string): Promise<ImportJob> {
+  const response = await ownerFetch(`/owner/immersion/imports/${jobId}/cancel`, { method: "POST" });
+  if (!response.ok) throw new Error((await response.json()).detail ?? "取消导入失败");
+  return response.json();
+}
+
+export async function retryImport(jobId: string): Promise<ImportJob> {
+  const response = await ownerFetch(`/owner/immersion/imports/${jobId}/retry`, { method: "POST" });
+  if (!response.ok) throw new Error((await response.json()).detail ?? "重新导入失败");
+  return response.json();
+}
+
 export async function listImports(): Promise<ImportJob[]> {
   const response = await ownerFetch("/owner/immersion/imports");
   if (!response.ok) throw new Error((await response.json()).detail ?? "读取导入列表失败");

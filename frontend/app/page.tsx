@@ -23,6 +23,7 @@ import {
 import { FormEvent, useEffect, useRef, useState } from "react";
 import {
   createUrlImport,
+  cancelImport,
   completeRolePlaySession,
   getAccessToken,
   getImport,
@@ -49,6 +50,7 @@ import {
   uploadMedia,
   saveVideoProgress,
   reviewVocabulary,
+  retryImport,
   type DictationResult,
   type ImportEvent,
   type ImportJob,
@@ -242,6 +244,18 @@ export default function Home() {
     }
   }
 
+  async function cancelCurrentImport() {
+    if (!importJob || !window.confirm("确定取消当前导入吗？已下载的临时内容不会继续处理。")) return;
+    try { setImportJob(await cancelImport(importJob.id)); }
+    catch (error) { notify(error instanceof Error ? error.message : "取消导入失败"); }
+  }
+
+  async function retryCurrentImport() {
+    if (!importJob) return;
+    try { setImportJob(await retryImport(importJob.id)); }
+    catch (error) { notify(error instanceof Error ? error.message : "重新导入失败"); }
+  }
+
   async function submitLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
@@ -404,8 +418,8 @@ export default function Home() {
         </section>
 
         <section className="section-heading"><div><p className="eyebrow">IMMERSION PATH</p><h2>正在进行</h2></div><button className="text-button" onClick={() => setActive("沉浸")}>查看全部 <ChevronRight size={16} /></button></section>
-        {importJob && <p className="import-status" role="status">导入进度：{importJob.progress}% · {importJob.message}</p>}
-        {importJob?.status === "failed" && importEvents.length > 0 && <p className="import-error">{importEvents.at(-1)?.message}</p>}
+        {importJob && <div className="import-status" role="status"><span>导入进度：{importJob.progress}% · {importJob.message}</span>{!["ready", "failed", "cancelled"].includes(importJob.status) ? <button className="text-button" type="button" onClick={() => void cancelCurrentImport()}>取消导入</button> : null}</div>}
+        {["failed", "cancelled"].includes(importJob?.status ?? "") && <div className="import-recovery"><p className="import-error">{importEvents.at(-1)?.message ?? (importJob?.status === "cancelled" ? "导入已取消。" : "导入失败。")}</p><button className="outline-button" type="button" onClick={() => void retryCurrentImport()}>重新导入</button><button className="text-button" type="button" onClick={() => setDialogOpen(true)}>改为上传文件</button></div>}
         <article className="lesson-card">
           <div className="video-cover">{importJob?.media_asset_id && media?.assetId === importJob.media_asset_id ? <video ref={videoRef} className="lesson-video" controls preload="metadata" src={media.url} onPause={persistVideoProgress} onEnded={persistVideoProgress} /> : <><span className="cover-label">BBC LEARNING</span><button className="play-button" aria-label="播放本课" onClick={() => notify("请先导入本地视频后播放。")}><Play fill="currentColor" /></button><span className="duration">12:48</span></>}</div>
           <div className="lesson-detail"><div className="lesson-meta"><span className="tag">B1 · en-GB</span><span>上次学习于今天 09:18</span></div><h3>How cities can become more liveable</h3><p>从城市生活议题中练习观点表达与自然连读。</p><div className="progress-line"><span style={{ width: "62%" }} /></div><div className="lesson-bottom"><strong>已完成 62%</strong><button className="outline-button" onClick={() => setActive("沉浸")}>继续 <ChevronRight size={16} /></button></div></div>

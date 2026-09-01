@@ -69,6 +69,10 @@ async def _advance(job_id: UUID, request_id: str | None) -> str:
                         )
                         await session.commit()
                         return "failed"
+                    await session.refresh(job)
+                    if job.status == "cancelled":
+                        (Path(settings.media_root).resolve() / stored_name).unlink(missing_ok=True)
+                        return "cancelled"
                     session.add(
                         MediaAsset(
                             owner_user_id=job.owner_user_id,
@@ -103,6 +107,9 @@ async def _advance(job_id: UUID, request_id: str | None) -> str:
                     )
                     await session.commit()
                     return "failed"
+                await session.refresh(job)
+                if job.status == "cancelled":
+                    return "cancelled"
                 await session.execute(
                     delete(TranscriptSegmentRecord).where(
                         TranscriptSegmentRecord.import_job_id == job.id

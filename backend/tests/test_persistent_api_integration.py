@@ -18,6 +18,7 @@ from app.main import app
 from app.models import (
     DictationAttempt,
     ImportJobRecord,
+    JobEvent,
     LearnerMemoryItem,
     MediaAsset,
     ProgressRecord,
@@ -65,8 +66,21 @@ async def test_owner_can_create_and_read_persistent_import() -> None:
             listed = await client.get("/api/owner/immersion/imports", headers=headers)
             assert listed.status_code == 200
             assert any(item["id"] == job_id for item in listed.json())
+            cancelled = await client.post(
+                f"/api/owner/immersion/imports/{job_id}/cancel", headers=headers
+            )
+            assert cancelled.status_code == 200
+            assert cancelled.json()["status"] == "cancelled"
+            assert cancelled.json()["message"] == "导入已取消"
+            retried = await client.post(
+                f"/api/owner/immersion/imports/{job_id}/retry", headers=headers
+            )
+            assert retried.status_code == 202
+            assert retried.json()["status"] == "queued"
     finally:
         async with SessionLocal() as session:
+            job_ids = select(ImportJobRecord.id).where(ImportJobRecord.owner_user_id == user.id)
+            await session.execute(delete(JobEvent).where(JobEvent.job_id.in_(job_ids)))
             await session.execute(
                 delete(ImportJobRecord).where(ImportJobRecord.owner_user_id == user.id)
             )
