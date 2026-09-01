@@ -47,3 +47,15 @@ export async function getImport(jobId: string): Promise<ImportJob> {
   if (!response.ok) throw new Error((await response.json()).detail ?? "读取导入进度失败");
   return response.json();
 }
+
+export type DictationResult = { score: number; missed_words: string[]; normalized_answer: string };
+
+export async function submitDictation(answer: string, reference: string): Promise<DictationResult> {
+  const response = await ownerFetch("/owner/dictation/attempts", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ answer, reference }),
+  });
+  if (!response.ok) throw new Error((await response.json()).detail ?? "听写提交失败");
+  return response.json();
+}

@@ -21,7 +21,15 @@ import {
   X,
 } from "lucide-react";
 import { FormEvent, useEffect, useState } from "react";
-import { createUrlImport, getAccessToken, getImport, login, type ImportJob } from "../lib/api";
+import {
+  createUrlImport,
+  getAccessToken,
+  getImport,
+  login,
+  submitDictation,
+  type DictationResult,
+  type ImportJob,
+} from "../lib/api";
 
 type Section = "今日" | "沉浸" | "复习" | "词库" | "我";
 
@@ -43,6 +51,7 @@ export default function Home() {
   const [toast, setToast] = useState("");
   const [dictation, setDictation] = useState("");
   const [checked, setChecked] = useState(false);
+  const [dictationResult, setDictationResult] = useState<DictationResult | null>(null);
   const [loginOpen, setLoginOpen] = useState(false);
   const [signedIn, setSignedIn] = useState(
     () => typeof window !== "undefined" && Boolean(getAccessToken()),
@@ -149,7 +158,7 @@ export default function Home() {
 
         <section className="review-panel" aria-labelledby="dictation-title">
           <div><p className="eyebrow">QUICK CHECK</p><h2 id="dictation-title">听写一句</h2><p className="quote">“The best way to learn is to stay curious.”</p><button className="sound-button" onClick={() => notify("正在播放示范音频。")}><Volume2 size={17} /> 播放 0:06</button></div>
-          <form onSubmit={(event) => { event.preventDefault(); setChecked(true); }}><label htmlFor="dictation">听到什么？</label><div className="input-row"><input id="dictation" value={dictation} onChange={(event) => { setDictation(event.target.value); setChecked(false); }} placeholder="输入你听到的英文…" /><button className="primary-button" type="submit">检查</button></div>{checked && <p className="feedback"><Check size={16} /> 很接近！注意 <em>stay curious</em> 的连读。</p>}</form>
+          <form onSubmit={async (event) => { event.preventDefault(); try { const result = await submitDictation(dictation, "The best way to learn is to stay curious."); setDictationResult(result); setChecked(true); } catch (error) { notify(error instanceof Error ? error.message : "听写提交失败"); } }}><label htmlFor="dictation">听到什么？</label><div className="input-row"><input id="dictation" value={dictation} onChange={(event) => { setDictation(event.target.value); setChecked(false); setDictationResult(null); }} placeholder="输入你听到的英文…" /><button className="primary-button" type="submit">检查</button></div>{checked && <p className="feedback"><Check size={16} /> {dictationResult ? <>得分 {dictationResult.score} 分{dictationResult.missed_words.length ? <>，漏掉 <em>{dictationResult.missed_words.join(", ")}</em></> : "，完全正确！"}</> : "正在计算…"}</p>}</form>
         </section>
       </section>
 
