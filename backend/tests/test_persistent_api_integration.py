@@ -57,30 +57,30 @@ async def test_owner_can_create_and_read_persistent_import() -> None:
     try:
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             created = await client.post(
-                "/api/owner/immersion/imports",
+                "/api/v1/owner/immersion/imports",
                 headers=headers,
                 json={"source_url": "https://www.youtube.com/watch?v=fixture", "accent": "en-US"},
             )
             assert created.status_code == 202
             job_id = created.json()["id"]
-            found = await client.get(f"/api/owner/immersion/imports/{job_id}", headers=headers)
+            found = await client.get(f"/api/v1/owner/immersion/imports/{job_id}", headers=headers)
             assert found.status_code == 200
             assert found.json()["id"] == job_id
-            listed = await client.get("/api/owner/immersion/imports", headers=headers)
+            listed = await client.get("/api/v1/owner/immersion/imports", headers=headers)
             assert listed.status_code == 200
             assert any(item["id"] == job_id for item in listed.json())
             cancelled = await client.post(
-                f"/api/owner/immersion/imports/{job_id}/cancel", headers=headers
+                f"/api/v1/owner/immersion/imports/{job_id}/cancel", headers=headers
             )
             assert cancelled.status_code == 200
             assert cancelled.json()["status"] == "cancelled"
             assert cancelled.json()["message"] == "导入已取消"
             events = await client.get(
-                f"/api/owner/immersion/imports/{job_id}/events", headers=headers
+                f"/api/v1/owner/immersion/imports/{job_id}/events", headers=headers
             )
             assert events.json()[-1]["status"] == "cancelled"
             retried = await client.post(
-                f"/api/owner/immersion/imports/{job_id}/retry", headers=headers
+                f"/api/v1/owner/immersion/imports/{job_id}/retry", headers=headers
             )
             assert retried.status_code == 202
             assert retried.json()["status"] == "queued"
@@ -119,7 +119,7 @@ async def test_owner_can_save_and_read_writing_attempt(monkeypatch: pytest.Monke
     try:
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             created = await client.post(
-                "/api/owner/writing/attempts",
+                "/api/v1/owner/writing/attempts",
                 headers=headers,
                 json={"prompt": "Describe a memorable journey.", "draft": "I travelled by train."},
             )
@@ -131,7 +131,7 @@ async def test_owner_can_save_and_read_writing_attempt(monkeypatch: pytest.Monke
             )
             assert result.result == "complete"
             found = await client.get(
-                f"/api/owner/writing/attempts/{created.json()['id']}", headers=headers
+                f"/api/v1/owner/writing/attempts/{created.json()['id']}", headers=headers
             )
             assert found.status_code == 200
             assert found.json()["draft"] == "I travelled by train."
@@ -160,19 +160,19 @@ async def test_owner_can_create_and_review_vocabulary() -> None:
     try:
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             created = await client.post(
-                "/api/owner/vocabulary/items",
+                "/api/v1/owner/vocabulary/items",
                 headers=headers,
                 json={"term": "curious", "definition": "wanting to know more"},
             )
             assert created.status_code == 201
             item_id = created.json()["id"]
-            listed = await client.get("/api/owner/vocabulary/items", headers=headers)
+            listed = await client.get("/api/v1/owner/vocabulary/items", headers=headers)
             assert listed.status_code == 200
             assert any(item["id"] == item_id for item in listed.json())
-            due = await client.get("/api/owner/vocabulary/due", headers=headers)
+            due = await client.get("/api/v1/owner/vocabulary/due", headers=headers)
             assert any(item["id"] == item_id for item in due.json())
             reviewed = await client.post(
-                f"/api/owner/vocabulary/items/{item_id}/review/easy", headers=headers
+                f"/api/v1/owner/vocabulary/items/{item_id}/review/easy", headers=headers
             )
             assert reviewed.status_code == 200
             assert reviewed.json()["repetitions"] == 1
@@ -205,16 +205,16 @@ async def test_owner_can_save_and_resume_learning_progress() -> None:
     }
     try:
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-            saved = await client.put("/api/owner/progress", headers=headers, json=payload)
+            saved = await client.put("/api/v1/owner/progress", headers=headers, json=payload)
             assert saved.status_code == 200
             updated = await client.put(
-                "/api/owner/progress",
+                "/api/v1/owner/progress",
                 headers=headers,
                 json={**payload, "completion_percent": 80, "last_position_seconds": 600},
             )
             assert updated.status_code == 200
             found = await client.get(
-                f"/api/owner/progress/immersion_video/{resource_id}", headers=headers
+                f"/api/v1/owner/progress/immersion_video/{resource_id}", headers=headers
             )
             assert found.status_code == 200
             assert found.json()["completion_percent"] == 80
@@ -242,7 +242,7 @@ async def test_owner_can_manage_learner_memory() -> None:
     try:
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             created = await client.post(
-                "/api/owner/memory",
+                "/api/v1/owner/memory",
                 headers=headers,
                 json={
                     "category": "grammar",
@@ -252,13 +252,15 @@ async def test_owner_can_manage_learner_memory() -> None:
             )
             assert created.status_code == 201
             memory_id = created.json()["id"]
-            listed = await client.get("/api/owner/memory", headers=headers)
+            listed = await client.get("/api/v1/owner/memory", headers=headers)
             assert [item["id"] for item in listed.json()] == [memory_id]
-            mastered = await client.post(f"/api/owner/memory/{memory_id}/master", headers=headers)
+            mastered = await client.post(
+                f"/api/v1/owner/memory/{memory_id}/master", headers=headers
+            )
             assert mastered.status_code == 200
             assert mastered.json()["status"] == "mastered"
-            assert (await client.get("/api/owner/memory", headers=headers)).json() == []
-            deleted = await client.delete(f"/api/owner/memory/{memory_id}", headers=headers)
+            assert (await client.get("/api/v1/owner/memory", headers=headers)).json() == []
+            deleted = await client.delete(f"/api/v1/owner/memory/{memory_id}", headers=headers)
             assert deleted.status_code == 204
     finally:
         async with SessionLocal() as session:
@@ -283,14 +285,14 @@ async def test_owner_can_create_role_play_session_and_turn() -> None:
     try:
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             created = await client.post(
-                "/api/owner/role-play/sessions",
+                "/api/v1/owner/role-play/sessions",
                 headers=headers,
                 json={"scenario": "Ordering coffee at a busy cafe"},
             )
             assert created.status_code == 201
             session_id = created.json()["id"]
             turn = await client.post(
-                f"/api/owner/role-play/sessions/{session_id}/turns",
+                f"/api/v1/owner/role-play/sessions/{session_id}/turns",
                 headers=headers,
                 json={"learner_message": "Could I have a latte, please?"},
             )
@@ -345,19 +347,19 @@ async def test_owner_can_complete_role_play_and_read_feedback(
     try:
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             created = await client.post(
-                "/api/owner/role-play/sessions",
+                "/api/v1/owner/role-play/sessions",
                 headers=headers,
                 json={"scenario": "Ordering coffee at a busy cafe"},
             )
             session_id = created.json()["id"]
             turn = await client.post(
-                f"/api/owner/role-play/sessions/{session_id}/turns",
+                f"/api/v1/owner/role-play/sessions/{session_id}/turns",
                 headers=headers,
                 json={"learner_message": "Could I have latte, please?"},
             )
             assert turn.status_code == 202
             completing = await client.post(
-                f"/api/owner/role-play/sessions/{session_id}/complete", headers=headers
+                f"/api/v1/owner/role-play/sessions/{session_id}/complete", headers=headers
             )
             assert completing.status_code == 202
             assert completing.json()["status"] == "evaluating"
@@ -365,7 +367,7 @@ async def test_owner_can_complete_role_play_and_read_feedback(
             result = await asyncio.to_thread(evaluate_role_play.apply, args=[session_id])
             assert result.result == "complete"
             found = await client.get(
-                f"/api/owner/role-play/sessions/{session_id}", headers=headers
+                f"/api/v1/owner/role-play/sessions/{session_id}", headers=headers
             )
             assert found.status_code == 200
             assert found.json()["status"] == "complete"
@@ -431,7 +433,7 @@ async def test_owner_can_read_only_own_role_play_tts_audio() -> None:
             await session.refresh(message)
         owner_headers = {"Authorization": f"Bearer {create_access_token(owner.id)}"}
         other_headers = {"Authorization": f"Bearer {create_access_token(other.id)}"}
-        url = f"/api/owner/role-play/sessions/{role_session.id}/messages/{message.id}/audio"
+        url = f"/api/v1/owner/role-play/sessions/{role_session.id}/messages/{message.id}/audio"
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             found = await client.get(url, headers=owner_headers)
             assert found.status_code == 200
@@ -470,7 +472,7 @@ async def test_owner_can_upload_and_range_stream_media() -> None:
     try:
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             uploaded = await client.post(
-                "/api/owner/immersion/uploads",
+                "/api/v1/owner/immersion/uploads",
                 headers=headers,
                 files={"video": ("fixture.mp4", b"\x00\x00\x00\x18ftypisomfake", "video/mp4")},
             )
@@ -484,18 +486,18 @@ async def test_owner_can_upload_and_range_stream_media() -> None:
                 stored_name = asset.stored_name
                 asset_id = asset.id
             streamed = await client.get(
-                f"/api/owner/immersion/media/{asset_id}",
+                f"/api/v1/owner/immersion/media/{asset_id}",
                 headers={**headers, "Range": "bytes=4-9"},
             )
             assert streamed.status_code == 206
             assert streamed.headers["content-range"] == "bytes 4-9/16"
             assert streamed.content == b"ftypis"
             deleted = await client.delete(
-                f"/api/owner/immersion/media/{asset_id}", headers=headers
+                f"/api/v1/owner/immersion/media/{asset_id}", headers=headers
             )
             assert deleted.status_code == 204
             unavailable = await client.get(
-                f"/api/owner/immersion/media/{asset_id}", headers=headers
+                f"/api/v1/owner/immersion/media/{asset_id}", headers=headers
             )
             assert unavailable.status_code == 404
             stored_name = None
@@ -540,13 +542,13 @@ async def test_owner_can_replace_and_read_transcript_segments() -> None:
     try:
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             saved = await client.put(
-                f"/api/owner/immersion/imports/{job.id}/transcript",
+                f"/api/v1/owner/immersion/imports/{job.id}/transcript",
                 headers=headers,
                 json=payload,
             )
             assert saved.status_code == 200
             found = await client.get(
-                f"/api/owner/immersion/imports/{job.id}/transcript", headers=headers
+                f"/api/v1/owner/immersion/imports/{job.id}/transcript", headers=headers
             )
             assert found.status_code == 200
             assert [item["text"] for item in found.json()] == [
@@ -579,7 +581,7 @@ async def test_owner_can_submit_persistent_dictation_attempt() -> None:
     try:
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             result = await client.post(
-                "/api/owner/dictation/attempts",
+                "/api/v1/owner/dictation/attempts",
                 headers=headers,
                 json={
                     "answer": "Learning takes practice",

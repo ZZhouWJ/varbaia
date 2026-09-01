@@ -8,13 +8,13 @@
 4. 在 `infra/` 执行 `docker compose --env-file ../.env up -d --build`；Backend 会先执行
    `alembic upgrade head`，端口必须只绑定 `127.0.0.1`。
 5. 将 `infra/nginx/varbaia.conf.example` 的域名改为实际域名，测试并 reload 已有 Nginx。
-6. 使用 `docker compose ps` 和 `curl http://127.0.0.1:8000/api/health` 检查服务；创建 Owner 后再开放登录。
+6. 使用 `docker compose ps` 和 `curl http://127.0.0.1:8000/api/v1/health` 检查服务；创建 Owner 后再开放登录。
 
 Backend 镜像会安装 FFmpeg 和项目锁定的 `yt-dlp`。首次验收请分别使用一段短英文公开视频、一次浏览器跟读录音和一次 Role Play 录音，确认下载、转写、评分与 TTS 都有对应的业务结果；不要在日志或工单中记录完整签名 URL 或任何 Secret。
 
 ## 备份
 
-备份文件必须写至服务器外部的受控挂载位置；`/api/health/ready` 会显示 `backup=not_configured`，直至设置 `BACKUP_DESTINATION`。使用仓库提供的脚本：
+备份文件必须写至服务器外部的受控挂载位置；`/api/v1/health/ready` 会显示 `backup=not_configured`，直至设置 `BACKUP_DESTINATION`。使用仓库提供的脚本：
 
 ```bash
 cd infra

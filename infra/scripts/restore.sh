@@ -25,4 +25,4 @@ if [ "$confirmation" != "RESTORE" ]; then
 fi
 
 gzip -dc "$dump_file" | docker compose exec -T postgres psql -U varbaia -d varbaia
-echo "数据库恢复完成；请启动服务并检查 /api/health/ready。"
+echo "数据库恢复完成；请启动服务并检查 /api/v1/health/ready。"

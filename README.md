@@ -20,7 +20,7 @@ backend/.venv/bin/pip install -e 'backend[dev]'
 backend/.venv/bin/uvicorn app.main:app --app-dir backend --reload --port 8000
 ```
 
-默认前端地址为 `http://localhost:3000`，健康检查为 `http://localhost:8000/api/health`。
+默认前端地址为 `http://localhost:3000`，健康检查为 `http://localhost:8000/api/v1/health`。
 
 ## 目录
 

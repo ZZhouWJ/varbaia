@@ -4,7 +4,7 @@ const emptyJson = { contentType: "application/json" };
 
 async function mockOwnerApi(page: import("@playwright/test").Page) {
   await page.addInitScript(() => window.localStorage.setItem("varbaia_access_token", "mock-token"));
-  await page.route("http://localhost:8000/api/**", async (route) => {
+  await page.route("http://localhost:8000/api/v1/**", async (route) => {
     const path = new URL(route.request().url()).pathname;
     const method = route.request().method();
     const reply = (body: object) => route.fulfill({ ...emptyJson, body: JSON.stringify(body) });

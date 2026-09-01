@@ -81,7 +81,7 @@ async def issue_session(
         secure=settings.cookie_secure or settings.app_env == "production",
         samesite=settings.cookie_samesite,
         max_age=settings.refresh_token_days * 86400,
-        path="/api/auth",
+        path="/api/v1/auth",
         domain=settings.cookie_domain or None,
     )
     return TokenResponse(access_token=create_access_token(user.id, settings))
@@ -157,6 +157,6 @@ async def logout(
             record.revoked_at = datetime.now(UTC)
             await session.commit()
     response.delete_cookie(
-        "varbaia_refresh", path="/api/auth", domain=settings.cookie_domain or None
+        "varbaia_refresh", path="/api/v1/auth", domain=settings.cookie_domain or None
     )
     return response

@@ -4,7 +4,7 @@ from sqlalchemy import text
 from app.core.config import Settings, get_settings
 from app.core.database import engine
 
-router = APIRouter(prefix="/api")
+router = APIRouter(prefix="/api/v1")
 
 
 @router.get("/health", tags=["system"])
