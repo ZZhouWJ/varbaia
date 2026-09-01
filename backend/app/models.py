@@ -65,6 +65,20 @@ class JobEvent(Base):
     )
 
 
+class MediaAsset(Base):
+    __tablename__ = "media_assets"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    owner_user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    import_job_id: Mapped[UUID] = mapped_column(ForeignKey("import_jobs.id"), index=True)
+    stored_name: Mapped[str] = mapped_column(String(120), unique=True)
+    mime_type: Mapped[str] = mapped_column(String(100))
+    size_bytes: Mapped[int] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC)
+    )
+
+
 class WritingAttempt(Base):
     __tablename__ = "writing_attempts"
 

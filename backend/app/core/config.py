@@ -20,6 +20,8 @@ class Settings(BaseSettings):
     ai_provider: str = "external"
     ai_api_base_url: str = ""
     ai_api_key: str = ""
+    media_root: str = "./data/media"
+    max_upload_mb: int = 500
 
     @property
     def allowed_origins(self) -> list[str]:
