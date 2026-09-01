@@ -10,6 +10,7 @@ from app.core.config import get_settings
 from app.core.database import SessionLocal, engine
 from app.core.tasks import celery_app
 from app.models import WritingAttempt
+from app.modules.learner_memory import record_signal
 from app.providers.ai import ExternalHttpProvider
 
 
@@ -43,6 +44,17 @@ async def _evaluate(attempt_id: UUID) -> str:
                 },
                 ensure_ascii=False,
             )
+            if attempt.clarity_score < 70:
+                await record_signal(
+                    session,
+                    owner_user_id=attempt.owner_user_id,
+                    category="writing",
+                    memory_key="writing-clarity",
+                    title="写作表达清晰度",
+                    detail="多次写作的清晰度低于 70 分；下一次先用一句主题句组织观点。",
+                    source_type="writing",
+                    severity=2 if attempt.clarity_score < 50 else 1,
+                )
             attempt.evaluation_status = "complete"
             await session.commit()
             return "complete"

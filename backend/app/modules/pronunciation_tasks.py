@@ -9,6 +9,7 @@ from app.core.config import get_settings
 from app.core.database import SessionLocal, engine
 from app.core.tasks import celery_app
 from app.models import PronunciationAttempt
+from app.modules.learner_memory import record_signal
 from app.providers.audio_normalization import normalize_audio
 from app.providers.pronunciation import PronunciationProviderError
 from app.providers.tencent_soe_n_assessment import TencentSOENAdapter
@@ -47,6 +48,33 @@ async def _evaluate(attempt_id: UUID) -> str:
             attempt.raw_provider_result_json = json.dumps(
                 assessment.raw_provider_result, ensure_ascii=False
             )
+            if (
+                assessment.pronunciation_accuracy is not None
+                and assessment.pronunciation_accuracy < 75
+            ):
+                await record_signal(
+                    session,
+                    owner_user_id=attempt.owner_user_id,
+                    category="pronunciation",
+                    memory_key="pronunciation-accuracy",
+                    title="英语发音准确度",
+                    detail="多次跟读的整体准确度低于 75 分；建议放慢速度并逐词重读。",
+                    source_type="pronunciation",
+                    severity=2 if assessment.pronunciation_accuracy < 55 else 1,
+                )
+            if (
+                assessment.pronunciation_fluency is not None
+                and assessment.pronunciation_fluency < 0.75
+            ):
+                await record_signal(
+                    session,
+                    owner_user_id=attempt.owner_user_id,
+                    category="fluency",
+                    memory_key="pronunciation-fluency",
+                    title="英语表达流利度",
+                    detail="多次跟读的流利度低于 0.75；建议使用短语块连续跟读。",
+                    source_type="pronunciation",
+                )
             attempt.evaluation_status = "complete"
             await session.commit()
             return "complete"

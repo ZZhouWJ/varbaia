@@ -177,6 +177,30 @@ class ProgressRecord(Base):
     )
 
 
+class LearnerMemoryItem(Base):
+    __tablename__ = "learner_memory_items"
+    __table_args__ = (
+        UniqueConstraint("owner_user_id", "category", "memory_key", name="uq_memory_owner_key"),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    owner_user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    category: Mapped[str] = mapped_column(String(24), index=True)
+    memory_key: Mapped[str] = mapped_column(String(160))
+    title: Mapped[str] = mapped_column(String(240))
+    detail: Mapped[str] = mapped_column(Text)
+    source_type: Mapped[str] = mapped_column(String(40))
+    occurrence_count: Mapped[int] = mapped_column(Integer, default=1)
+    severity: Mapped[int] = mapped_column(Integer, default=1)
+    status: Mapped[str] = mapped_column(String(24), default="active", index=True)
+    last_seen_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC)
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC)
+    )
+
+
 class RolePlaySession(Base):
     __tablename__ = "role_play_sessions"
 

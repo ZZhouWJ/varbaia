@@ -18,6 +18,7 @@ from app.main import app
 from app.models import (
     DictationAttempt,
     ImportJobRecord,
+    LearnerMemoryItem,
     MediaAsset,
     ProgressRecord,
     RolePlayMessage,
@@ -200,6 +201,47 @@ async def test_owner_can_save_and_resume_learning_progress() -> None:
         async with SessionLocal() as session:
             await session.execute(
                 delete(ProgressRecord).where(ProgressRecord.owner_user_id == user.id)
+            )
+            await session.execute(delete(User).where(User.id == user.id))
+            await session.commit()
+
+
+@pytest.mark.asyncio
+async def test_owner_can_manage_learner_memory() -> None:
+    user = User(
+        email=f"memory-{uuid4()}@example.com",
+        password_hash=PasswordHasher().hash("long-test-password"),
+    )
+    async with SessionLocal() as session:
+        session.add(user)
+        await session.commit()
+        await session.refresh(user)
+    headers = {"Authorization": f"Bearer {create_access_token(user.id)}"}
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            created = await client.post(
+                "/api/owner/memory",
+                headers=headers,
+                json={
+                    "category": "grammar",
+                    "title": "第三人称单数",
+                    "detail": "说现在时的时候检查动词是否需要 -s。",
+                },
+            )
+            assert created.status_code == 201
+            memory_id = created.json()["id"]
+            listed = await client.get("/api/owner/memory", headers=headers)
+            assert [item["id"] for item in listed.json()] == [memory_id]
+            mastered = await client.post(f"/api/owner/memory/{memory_id}/master", headers=headers)
+            assert mastered.status_code == 200
+            assert mastered.json()["status"] == "mastered"
+            assert (await client.get("/api/owner/memory", headers=headers)).json() == []
+            deleted = await client.delete(f"/api/owner/memory/{memory_id}", headers=headers)
+            assert deleted.status_code == 204
+    finally:
+        async with SessionLocal() as session:
+            await session.execute(
+                delete(LearnerMemoryItem).where(LearnerMemoryItem.owner_user_id == user.id)
             )
             await session.execute(delete(User).where(User.id == user.id))
             await session.commit()
