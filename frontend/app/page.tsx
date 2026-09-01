@@ -21,6 +21,7 @@ import {
   X,
 } from "lucide-react";
 import { FormEvent, useEffect, useState } from "react";
+import { createUrlImport, getAccessToken, login } from "../lib/api";
 
 type Section = "今日" | "沉浸" | "复习" | "词库" | "我";
 
@@ -42,6 +43,11 @@ export default function Home() {
   const [toast, setToast] = useState("");
   const [dictation, setDictation] = useState("");
   const [checked, setChecked] = useState(false);
+  const [loginOpen, setLoginOpen] = useState(false);
+  const [signedIn, setSignedIn] = useState(
+    () => typeof window !== "undefined" && Boolean(getAccessToken()),
+  );
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     document.documentElement.dataset.theme = dark ? "dark" : "light";
@@ -52,10 +58,28 @@ export default function Home() {
     window.setTimeout(() => setToast(""), 3200);
   }
 
-  function submitImport(event: FormEvent<HTMLFormElement>) {
+  async function submitImport(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setDialogOpen(false);
-    notify("视频已加入处理队列，完成后会出现在沉浸学习中。");
+    const sourceUrl = new FormData(event.currentTarget).get("source_url")?.toString() ?? "";
+    setSubmitting(true);
+    try {
+      await createUrlImport(sourceUrl);
+      setDialogOpen(false);
+      notify("视频已加入处理队列，完成后会出现在沉浸学习中。");
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "导入失败，请稍后重试。");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function submitLogin(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    try {
+      await login(form.get("email")?.toString() ?? "", form.get("password")?.toString() ?? "");
+      setSignedIn(true); setLoginOpen(false); notify("Owner 登录成功。");
+    } catch (error) { notify(error instanceof Error ? error.message : "登录失败"); }
   }
 
   return (
@@ -74,7 +98,7 @@ export default function Home() {
           <button className="theme-toggle" onClick={() => setDark((value) => !value)} aria-label="切换明暗主题">
             {dark ? <Sun size={18} /> : <Moon size={18} />} {dark ? "浅色" : "深色"}
           </button>
-          <div className="identity"><span>WZ</span><div><strong>Wenjie</strong><small>个人学习空间</small></div></div>
+          <button className="identity" onClick={() => setLoginOpen(true)}><span>WZ</span><div><strong>{signedIn ? "Wenjie" : "登录 Owner"}</strong><small>{signedIn ? "个人学习空间" : "访问学习资料"}</small></div></button>
         </div>
       </aside>
 
@@ -118,7 +142,8 @@ export default function Home() {
 
       <nav className="bottom-nav" aria-label="移动端主导航">{navigation.map(({ label, icon: Icon }) => <button key={label} className={active === label ? "is-active" : ""} onClick={() => setActive(label)}><Icon size={20} /><span>{label}</span></button>)}</nav>
 
-      {dialogOpen && <div className="modal-layer" role="dialog" aria-modal="true" aria-labelledby="import-title"><button className="scrim" aria-label="关闭导入窗口" onClick={() => setDialogOpen(false)} /><form className="import-modal" onSubmit={submitImport}><div className="modal-heading"><div><p className="eyebrow">NEW IMMERSION</p><h2 id="import-title">导入一段英语视频</h2></div><button type="button" className="icon-button" aria-label="关闭" onClick={() => setDialogOpen(false)}><X /></button></div><label htmlFor="video-url">HTTPS 视频链接</label><input id="video-url" type="url" required placeholder="https://www.youtube.com/watch?..." /><p className="form-note">当前仅接收已授权的平台链接；导入后会异步生成英语片段与练习。</p><div className="modal-actions"><button type="button" className="text-button" onClick={() => setDialogOpen(false)}>取消</button><button className="primary-button" type="submit">加入队列 <ChevronRight size={17} /></button></div></form></div>}
+      {dialogOpen && <div className="modal-layer" role="dialog" aria-modal="true" aria-labelledby="import-title"><button className="scrim" aria-label="关闭导入窗口" onClick={() => setDialogOpen(false)} /><form className="import-modal" onSubmit={submitImport}><div className="modal-heading"><div><p className="eyebrow">NEW IMMERSION</p><h2 id="import-title">导入一段英语视频</h2></div><button type="button" className="icon-button" aria-label="关闭" onClick={() => setDialogOpen(false)}><X /></button></div><label htmlFor="video-url">HTTPS 视频链接</label><input id="video-url" name="source_url" type="url" required placeholder="https://www.youtube.com/watch?..." /><p className="form-note">当前仅接收已授权的平台链接；导入后会异步生成英语片段与练习。</p><div className="modal-actions"><button type="button" className="text-button" onClick={() => setDialogOpen(false)}>取消</button><button className="primary-button" disabled={submitting} type="submit">{submitting ? "提交中…" : "加入队列"} <ChevronRight size={17} /></button></div></form></div>}
+      {loginOpen && <div className="modal-layer" role="dialog" aria-modal="true" aria-labelledby="login-title"><button className="scrim" aria-label="关闭登录窗口" onClick={() => setLoginOpen(false)} /><form className="import-modal" onSubmit={submitLogin}><div className="modal-heading"><div><p className="eyebrow">OWNER ACCESS</p><h2 id="login-title">登录个人学习空间</h2></div><button type="button" className="icon-button" aria-label="关闭" onClick={() => setLoginOpen(false)}><X /></button></div><label htmlFor="owner-email">邮箱</label><input id="owner-email" name="email" type="email" required /><label htmlFor="owner-password">密码</label><input id="owner-password" name="password" type="password" minLength={12} required /><div className="modal-actions"><button className="primary-button" type="submit">登录</button></div></form></div>}
       {toast && <div className="toast" role="status"><Check size={18} /> {toast}</div>}
     </main>
   );
