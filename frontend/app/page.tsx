@@ -25,12 +25,14 @@ import {
   createUrlImport,
   getAccessToken,
   getImport,
+  getImportEvents,
   listImports,
   login,
   logout,
   submitDictation,
   uploadMedia,
   type DictationResult,
+  type ImportEvent,
   type ImportJob,
 } from "../lib/api";
 
@@ -61,6 +63,7 @@ export default function Home() {
   );
   const [submitting, setSubmitting] = useState(false);
   const [importJob, setImportJob] = useState<ImportJob | null>(null);
+  const [importEvents, setImportEvents] = useState<ImportEvent[]>([]);
 
   useEffect(() => {
     document.documentElement.dataset.theme = dark ? "dark" : "light";
@@ -81,6 +84,11 @@ export default function Home() {
       });
     }, 2000);
     return () => window.clearInterval(timer);
+  }, [importJob]);
+
+  useEffect(() => {
+    if (!importJob) return;
+    getImportEvents(importJob.id).then(setImportEvents).catch(() => undefined);
   }, [importJob]);
 
   function notify(message: string) {
@@ -165,6 +173,7 @@ export default function Home() {
 
         <section className="section-heading"><div><p className="eyebrow">IMMERSION PATH</p><h2>正在进行</h2></div><button className="text-button" onClick={() => setActive("沉浸")}>查看全部 <ChevronRight size={16} /></button></section>
         {importJob && <p className="import-status" role="status">导入进度：{importJob.progress}% · {importJob.message}</p>}
+        {importJob?.status === "failed" && importEvents.length > 0 && <p className="import-error">{importEvents.at(-1)?.message}</p>}
         <article className="lesson-card">
           <div className="video-cover"><span className="cover-label">BBC LEARNING</span><button className="play-button" aria-label="播放本课" onClick={() => notify("已从 06:42 继续播放。")}><Play fill="currentColor" /></button><span className="duration">12:48</span></div>
           <div className="lesson-detail"><div className="lesson-meta"><span className="tag">B1 · en-GB</span><span>上次学习于今天 09:18</span></div><h3>How cities can become more liveable</h3><p>从城市生活议题中练习观点表达与自然连读。</p><div className="progress-line"><span style={{ width: "62%" }} /></div><div className="lesson-bottom"><strong>已完成 62%</strong><button className="outline-button" onClick={() => setActive("沉浸")}>继续 <ChevronRight size={16} /></button></div></div>
