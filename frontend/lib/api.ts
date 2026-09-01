@@ -133,7 +133,7 @@ export type WritingAttempt = {
   draft: string;
   clarity_score: number | null;
   evaluation_status: string;
-  feedback: { corrected_draft?: string; suggestions?: string[] } | null;
+  feedback: { corrected_draft?: string; suggestions?: string[]; grammar_score?: number | null; vocabulary_score?: number | null; coherence_score?: number | null; task_completion_score?: number | null; key_errors?: string[]; better_expressions?: string[] } | null;
   evaluation_error: string | null;
 };
 

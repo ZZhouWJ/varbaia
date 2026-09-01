@@ -41,6 +41,12 @@ async def _evaluate(attempt_id: UUID) -> str:
                 {
                     "corrected_draft": result.corrected_draft,
                     "suggestions": result.suggestions,
+                    "grammar_score": result.grammar_score,
+                    "vocabulary_score": result.vocabulary_score,
+                    "coherence_score": result.coherence_score,
+                    "task_completion_score": result.task_completion_score,
+                    "key_errors": result.key_errors or [],
+                    "better_expressions": result.better_expressions or [],
                 },
                 ensure_ascii=False,
             )

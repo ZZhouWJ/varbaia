@@ -11,6 +11,12 @@ class WritingEvaluation:
     clarity_score: int
     corrected_draft: str
     suggestions: list[str]
+    grammar_score: int | None = None
+    vocabulary_score: int | None = None
+    coherence_score: int | None = None
+    task_completion_score: int | None = None
+    key_errors: list[str] | None = None
+    better_expressions: list[str] | None = None
 
 
 @dataclass(frozen=True)
@@ -46,8 +52,10 @@ class ExternalHttpProvider:
                 {
                     "role": "system",
                     "content": (
-                        "Return ONLY a JSON object with clarity_score (integer 0-100), "
-                        "corrected_draft (string), and suggestions (array of concise strings)."
+                        "Return ONLY a JSON object with integer 0-100 fields clarity_score, "
+                        "grammar_score, vocabulary_score, coherence_score, task_completion_score; "
+                        "corrected_draft (string); suggestions, key_errors, and better_expressions "
+                        "(arrays of concise strings). Assess English writing only."
                     ),
                 },
                 {"role": "user", "content": f"Prompt: {prompt}\nDraft: {draft}"},
@@ -69,6 +77,12 @@ class ExternalHttpProvider:
             clarity_score=int(data["clarity_score"]),
             corrected_draft=str(data["corrected_draft"]),
             suggestions=[str(item) for item in data["suggestions"]],
+            grammar_score=_optional_score(data.get("grammar_score")),
+            vocabulary_score=_optional_score(data.get("vocabulary_score")),
+            coherence_score=_optional_score(data.get("coherence_score")),
+            task_completion_score=_optional_score(data.get("task_completion_score")),
+            key_errors=[str(item) for item in data.get("key_errors", [])],
+            better_expressions=[str(item) for item in data.get("better_expressions", [])],
         )
 
     async def transcribe_english(self, audio_url: str) -> list[dict[str, object]]:
@@ -117,3 +131,9 @@ class ExternalHttpProvider:
 
         data = json.loads(response.json()["choices"][0]["message"]["content"])
         return RolePlayReply(reply=str(data["reply"]), coaching_tip=str(data["coaching_tip"]))
+
+
+def _optional_score(value: object) -> int | None:
+    if value is None:
+        return None
+    return max(0, min(100, int(value)))
