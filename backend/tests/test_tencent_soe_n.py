@@ -1,3 +1,5 @@
+from urllib.parse import parse_qs, urlparse
+
 from app.core.config import Settings
 from app.providers.tencent_soe_n import signed_soe_n_handshake_target, soe_n_handshake_target
 
@@ -35,6 +37,18 @@ def test_soe_n_signing_keeps_english_engine_and_hides_secret_key() -> None:
     assert "signature=" in target.url
     assert "voice_id=voice-123" in target.url
     assert target.voice_id == "voice-123"
+    params = dict(target.signature_params)
+    assert params["eval_mode"] == "1"
+    assert params["ref_text"] == "hello world"
+    assert params["score_coeff"] == "1.0"
+    assert params["voice_format"] == "0"
+    assert params["rec_mode"] == "0"
+    assert params["sentence_info_enabled"] == "0"
+    assert params["text_mode"] == "0"
+    url_params = parse_qs(urlparse(target.url).query)
+    assert {key: value for key, value in url_params.items() if key != "signature"} == {
+        key: [value] for key, value in target.signature_params
+    }
 
 
 def test_soe_n_creates_unique_nonempty_voice_id_for_each_connection() -> None:

@@ -26,6 +26,7 @@ class SoeNHandshakeTarget:
     url: str
     server_engine_type: str
     voice_id: str | None = None
+    signature_params: tuple[tuple[str, str], ...] = ()
 
 
 def soe_n_handshake_target(settings: Settings) -> SoeNHandshakeTarget:
@@ -54,17 +55,25 @@ def signed_soe_n_handshake_target(
     if not current_voice_id or len(current_voice_id) > 128:
         raise ValueError("SOE-N voice_id 必须为 1 到 128 个字符。")
     params = {
+        "eval_mode": "1",
         "expired": str(now + 3600),
         "nonce": str(nonce),
+        "rec_mode": "0",
+        "ref_text": "hello world",
+        "score_coeff": "1.0",
         "secretid": settings.tencentcloud_secret_id,
         "server_engine_type": target.server_engine_type,
+        "sentence_info_enabled": "0",
+        "text_mode": "0",
         "timestamp": str(now),
         "voice_format": "0",
         "voice_id": current_voice_id,
     }
-    query = urlencode(sorted(params.items()))
+    signature_params = tuple(sorted(params.items()))
+    raw_query = "&".join(f"{key}={value}" for key, value in signature_params)
+    query = urlencode(signature_params)
     path = target.url.removeprefix(f"wss://{SOE_N_HOST}")
-    sign_source = f"GET{SOE_N_HOST}{path}?{query}".encode()
+    sign_source = f"GET{SOE_N_HOST}{path}?{raw_query}".encode()
     signature = base64.b64encode(
         hmac.new(settings.tencentcloud_secret_key.encode(), sign_source, hashlib.sha1).digest()
     ).decode()
@@ -72,6 +81,7 @@ def signed_soe_n_handshake_target(
         url=f"{target.url}?{query}&signature={quote(signature, safe='')}",
         server_engine_type=target.server_engine_type,
         voice_id=current_voice_id,
+        signature_params=signature_params,
     )
 
 
