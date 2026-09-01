@@ -123,6 +123,7 @@ export async function saveVideoProgress(jobId: string, positionSeconds: number, 
 }
 
 export type DictationResult = { score: number; missed_words: string[]; normalized_answer: string };
+export type VocabularyItem = { id: string; term: string; definition: string; interval_days: number; ease: number; repetitions: number; next_review_at: string };
 export type RolePlaySession = { id: string; scenario: string; status: string; messages: Array<{ speaker: string; content: string; coaching_tip: string | null }> };
 export type WritingAttempt = {
   id: string;
@@ -179,5 +180,17 @@ export async function submitWriting(prompt: string, content: string): Promise<Wr
 export async function getWritingAttempt(attemptId: string): Promise<WritingAttempt> {
   const response = await ownerFetch(`/owner/writing/attempts/${attemptId}`);
   if (!response.ok) throw new Error((await response.json()).detail ?? "读取写作反馈失败");
+  return response.json();
+}
+
+export async function listVocabularyItems(): Promise<VocabularyItem[]> {
+  const response = await ownerFetch("/owner/vocabulary/items");
+  if (!response.ok) throw new Error((await response.json()).detail ?? "读取词库失败");
+  return response.json();
+}
+
+export async function reviewVocabulary(itemId: string, grade: "again" | "hard" | "good" | "easy"): Promise<VocabularyItem> {
+  const response = await ownerFetch(`/owner/vocabulary/items/${itemId}/review/${grade}`, { method: "POST" });
+  if (!response.ok) throw new Error((await response.json()).detail ?? "保存复习结果失败");
   return response.json();
 }

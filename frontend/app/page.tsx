@@ -32,6 +32,7 @@ import {
   getWritingAttempt,
   createRolePlaySession,
   listImports,
+  listVocabularyItems,
   login,
   logout,
   submitDictation,
@@ -39,12 +40,14 @@ import {
   submitWriting,
   uploadMedia,
   saveVideoProgress,
+  reviewVocabulary,
   type DictationResult,
   type ImportEvent,
   type ImportJob,
   type RolePlaySession,
   type TranscriptSegment,
   type WritingAttempt,
+  type VocabularyItem,
 } from "../lib/api";
 
 type Section = "今日" | "沉浸" | "复习" | "词库" | "我";
@@ -84,6 +87,7 @@ export default function Home() {
   const [writingOpen, setWritingOpen] = useState(false);
   const [writing, setWriting] = useState<WritingAttempt | null>(null);
   const [writingDraft, setWritingDraft] = useState("");
+  const [vocabulary, setVocabulary] = useState<VocabularyItem[]>([]);
   const writingPrompt = "Describe one small change that could make your city more liveable.";
   const importJobId = importJob?.id;
 
@@ -96,6 +100,13 @@ export default function Home() {
     listImports()
       .then((jobs) => setImportJob((current) => current ?? jobs[0] ?? null))
       .catch((error: unknown) => notify(error instanceof Error ? error.message : "无法恢复导入任务"));
+  }, [signedIn]);
+
+  useEffect(() => {
+    if (!signedIn) return;
+    listVocabularyItems().then(setVocabulary).catch((error: unknown) => {
+      notify(error instanceof Error ? error.message : "无法读取词库");
+    });
   }, [signedIn]);
 
   useEffect(() => {
@@ -224,6 +235,14 @@ export default function Home() {
     saveVideoProgress(importJob.id, video.currentTime, video.duration).catch(() => undefined);
   }
 
+  async function gradeVocabulary(item: VocabularyItem, grade: "again" | "hard" | "good" | "easy") {
+    try {
+      const updated = await reviewVocabulary(item.id, grade);
+      setVocabulary((items) => items.map((current) => current.id === updated.id ? updated : current));
+      notify(`已安排下次复习：${updated.interval_days} 天后。`);
+    } catch (error) { notify(error instanceof Error ? error.message : "保存复习结果失败"); }
+  }
+
   return (
     <main className="app-shell">
       <aside className={`sidebar ${menuOpen ? "sidebar--open" : ""}`} aria-label="主导航">
@@ -278,6 +297,8 @@ export default function Home() {
             return <button className="practice-card" key={step} onClick={() => step === "角色扮演" ? openRolePlay() : notify(`${step}练习已准备好。`)}><span className="practice-index">0{index + 1}</span><Icon aria-hidden /><strong>{step}</strong><small>{["听懂语块", "补全句子", "模仿节奏", "开口回应"][index]}</small></button>;
           })}
         </section>
+
+        {signedIn && <section className="vocabulary-panel" aria-labelledby="vocabulary-title"><div className="section-heading"><div><p className="eyebrow">PERSONAL VOCABULARY</p><h2 id="vocabulary-title">我的词库</h2></div><span className="subtle-count">{vocabulary.length} 个词</span></div>{vocabulary.length === 0 ? <p className="form-note">还没有保存的词汇。完成视频学习后可在这里持续复习。</p> : <div className="vocabulary-list">{vocabulary.slice(0, 6).map((item) => <article key={item.id}><div><strong>{item.term}</strong><p>{item.definition}</p><small>已复习 {item.repetitions} 次 · 间隔 {item.interval_days} 天</small></div><div className="review-grades"><button onClick={() => gradeVocabulary(item, "again")}>重来</button><button onClick={() => gradeVocabulary(item, "hard")}>困难</button><button onClick={() => gradeVocabulary(item, "good")}>掌握</button><button onClick={() => gradeVocabulary(item, "easy")}>简单</button></div></article>)}</div>}</section>}
 
         <section className="review-panel" aria-labelledby="dictation-title">
           <div><p className="eyebrow">QUICK CHECK</p><h2 id="dictation-title">听写一句</h2><p className="quote">“The best way to learn is to stay curious.”</p><button className="sound-button" onClick={() => notify("正在播放示范音频。")}><Volume2 size={17} /> 播放 0:06</button></div>
