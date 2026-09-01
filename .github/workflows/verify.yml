@@ -45,5 +45,5 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: docker build --tag varbaia-frontend:ci ./frontend
+      - run: docker build --file frontend/Dockerfile --tag varbaia-frontend:ci .
       - run: docker build --tag varbaia-backend:ci ./backend
