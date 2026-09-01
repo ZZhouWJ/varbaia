@@ -187,7 +187,7 @@ async def get_message_audio(
 
 
 @router.get("/sessions/{session_id}", response_model=SessionResponse)
-async def get_session(
+async def get_role_play_session(
     session_id: UUID,
     owner: User = Depends(get_owner),
     db: AsyncSession = Depends(get_session),

@@ -194,4 +194,6 @@ class ExternalHttpProvider:
 def _optional_score(value: object) -> int | None:
     if value is None:
         return None
+    if isinstance(value, bool) or not isinstance(value, int | float | str):
+        return None
     return max(0, min(100, int(value)))

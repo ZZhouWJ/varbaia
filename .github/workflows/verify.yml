@@ -18,6 +18,7 @@ jobs:
           python-version: "3.12"
       - run: pip install -e '.[dev]'
       - run: ruff check .
+      - run: mypy app
       - run: alembic heads
       - run: pytest
 

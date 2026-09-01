@@ -7,11 +7,14 @@ from pydantic import BaseModel, Field, HttpUrl, field_validator
 
 class ImportStatus(StrEnum):
     queued = "queued"
+    validating = "validating"
     fetching = "fetching"
+    fetching_metadata = "fetching_metadata"
     transcribing = "transcribing"
     segmenting = "segmenting"
     ready = "ready"
     failed = "failed"
+    cancelled = "cancelled"
 
 
 class VideoImportRequest(BaseModel):

@@ -4,7 +4,7 @@ import asyncio
 from pathlib import Path
 from uuid import UUID, uuid4
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 
 from app.core.config import get_settings
 from app.core.database import SessionLocal, engine
@@ -104,7 +104,7 @@ async def _advance(job_id: UUID, request_id: str | None) -> str:
                     await session.commit()
                     return "failed"
                 await session.execute(
-                    TranscriptSegmentRecord.__table__.delete().where(
+                    delete(TranscriptSegmentRecord).where(
                         TranscriptSegmentRecord.import_job_id == job.id
                     )
                 )
@@ -112,17 +112,23 @@ async def _advance(job_id: UUID, request_id: str | None) -> str:
                     TranscriptSegmentRecord(
                         import_job_id=job.id,
                         position=index,
-                        start_ms=round(float(segment["start"]) * 1000),
-                        end_ms=round(float(segment["end"]) * 1000),
+                        start_ms=round(_seconds(segment.get("start")) * 1000),
+                        end_ms=round(_seconds(segment.get("end")) * 1000),
                         text=str(segment["text"]),
                     )
                     for index, segment in enumerate(segments)
-                    if float(segment["end"]) > float(segment["start"])
+                    if _seconds(segment.get("end")) > _seconds(segment.get("start"))
                 )
                 await session.commit()
             return next_status
     finally:
         await engine.dispose()
+
+
+def _seconds(value: object) -> float:
+    if isinstance(value, bool) or not isinstance(value, int | float | str):
+        raise ValueError("转写片段缺少有效时间戳")
+    return float(value)
 
 
 @celery_app.task(

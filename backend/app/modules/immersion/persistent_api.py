@@ -22,6 +22,7 @@ from app.modules.immersion.media import (
 from app.modules.immersion.quota import DiskBudget, enforce_disk_budget
 from app.modules.immersion.schemas import (
     ImportJob,
+    ImportStatus,
     TranscriptReplace,
     TranscriptSegment,
     VideoImportRequest,
@@ -44,7 +45,7 @@ def to_schema(record: ImportJobRecord, media_asset_id: UUID | None = None) -> Im
     return ImportJob(
         id=record.id,
         source_url=record.source_url,
-        status=record.status,
+        status=ImportStatus(record.status),
         progress=record.progress,
         message=message,
         media_asset_id=media_asset_id,
