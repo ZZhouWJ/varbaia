@@ -105,10 +105,11 @@ export type RolePlaySession = { id: string; scenario: string; status: string; me
 export type WritingAttempt = {
   id: string;
   prompt: string;
-  content: string;
-  status: string;
-  feedback: { summary?: string; corrections?: string[]; improved_version?: string } | null;
-  error_message: string | null;
+  draft: string;
+  clarity_score: number | null;
+  evaluation_status: string;
+  feedback: { corrected_draft?: string; suggestions?: string[] } | null;
+  evaluation_error: string | null;
 };
 
 export async function submitDictation(answer: string, reference: string): Promise<DictationResult> {
@@ -147,7 +148,7 @@ export async function submitWriting(prompt: string, content: string): Promise<Wr
   const response = await ownerFetch("/owner/writing/attempts", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ prompt, content }),
+    body: JSON.stringify({ prompt, draft: content }),
   });
   if (!response.ok) throw new Error((await response.json()).detail ?? "写作提交失败");
   return response.json();
